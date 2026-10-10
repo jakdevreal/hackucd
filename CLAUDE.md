@@ -46,4 +46,3 @@ We own the **backend and storage**. Another part of the team owns the frontend.
 
 - GitHub repo: `jackdevreal/hackucd`
 - We work as GitHub user `mrcheesechase`, which has access to this repo. Use this account for commits, pushes and pull requests.
-- The repo is shared with three teammates. Work on a branch, and never force-push or rewrite history on `main`.
