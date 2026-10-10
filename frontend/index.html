@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>OutSpoken</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='27' fill='none' stroke='%2310B981' stroke-width='7'/%3E%3Crect x='15' y='27' width='5' height='10' rx='2.5' fill='%2306B6D4'/%3E%3Crect x='23' y='21' width='5' height='22' rx='2.5' fill='%2306B6D4'/%3E%3Crect x='31' y='16' width='5' height='32' rx='2.5' fill='%2306B6D4'/%3E%3Crect x='39' y='22' width='5' height='20' rx='2.5' fill='%2306B6D4'/%3E%3Crect x='47' y='28' width='4' height='8' rx='2' fill='%2306B6D4'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -34,11 +35,17 @@
   <!-- Header -->
   <header class="sticky top-0 z-20 border-b border-warm bg-paper/90 backdrop-blur">
     <div class="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
-      <a href="#" class="flex items-center gap-2 font-bold">
-        <span class="grid h-8 w-8 place-items-center rounded-lg bg-primary text-white">
-          <svg viewBox="0 0 24 24" class="h-4 w-4" fill="currentColor"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z"/></svg>
-        </span>
-        OutSpoken
+      <a href="#" class="flex items-center gap-2 text-lg font-bold tracking-tight" aria-label="OutSpoken home">
+        <!-- Logo: "sound ring", an emerald O with a cyan waveform through it -->
+        <svg viewBox="0 0 64 64" class="h-8 w-8" aria-hidden="true">
+          <circle cx="32" cy="32" r="27" fill="none" stroke="#10B981" stroke-width="7"/>
+          <rect x="15" y="27" width="5" height="10" rx="2.5" fill="#06B6D4"/>
+          <rect x="23" y="21" width="5" height="22" rx="2.5" fill="#06B6D4"/>
+          <rect x="31" y="16" width="5" height="32" rx="2.5" fill="#06B6D4"/>
+          <rect x="39" y="22" width="5" height="20" rx="2.5" fill="#06B6D4"/>
+          <rect x="47" y="28" width="4" height="8" rx="2" fill="#06B6D4"/>
+        </svg>
+        <span><span class="text-emerald-600">Out</span><span class="text-accent">Spoken</span></span>
       </a>
       <nav class="hidden gap-1 text-sm sm:flex">
         <a v-for="link in navLinks" :key="link.href" :href="link.href"
