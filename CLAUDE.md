@@ -29,7 +29,6 @@ We own the **backend and storage**. Another part of the team owns the frontend.
 
 | Layer | Choice |
 | --- | --- |
-| Frontend | Vue.js (not ours) |
 | Frontend | Vue.js with Tailwind CSS (not ours) |
 | Backend | Node.js with Express |
 | AI | OpenRouter API |
@@ -45,5 +44,5 @@ We own the **backend and storage**. Another part of the team owns the frontend.
 
 ## Repository
 
-- GitHub repo: `jackdevreal/hackucd`
+- GitHub repo: `jakdevreal/hackucd`
 - We work as GitHub user `mrcheesechase`, which has access to this repo. Use this account for commits, pushes and pull requests.

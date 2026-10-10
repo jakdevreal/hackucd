@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OutSpoken</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script>
+    // Palette from the design brief
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#10B981', // emerald: buttons, active states, progress, brand
+            accent: '#06B6D4', // cyan: waveforms, speech-speed charts, highlights
+            mint: '#A7F3D0', // progress backgrounds, positive feedback
+            warm: '#EDE9E8', // borders, dividers, subdued UI
+            paper: '#FAFAF8', // app background
+          },
+        },
+      },
+    };
+  </script>
+  <script src="https://unpkg.com/vue@3.4.38/dist/vue.global.prod.js"></script>
+  <style>[v-cloak] { display: none; }</style>
+</head>
+<body class="bg-paper text-stone-800 antialiased">
+<div id="app" v-cloak>
+
+  <!-- Header -->
+  <header class="sticky top-0 z-10 border-b border-warm bg-paper/90 backdrop-blur">
+    <div class="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
+      <a href="#" class="flex items-center gap-2 font-bold">
+        <span class="grid h-8 w-8 place-items-center rounded-lg bg-primary text-white">
+          <svg viewBox="0 0 24 24" class="h-4 w-4" fill="currentColor"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z"/></svg>
+        </span>
+        OutSpoken
+      </a>
+      <nav class="flex gap-1 text-sm">
+        <a v-for="link in navLinks" :key="link.href" :href="link.href"
+           class="rounded-md px-3 py-1.5 text-stone-600 hover:bg-warm hover:text-stone-900">{{ link.label }}</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-5xl px-4">
+
+    <!-- Hero -->
+    <section class="py-16 text-center sm:py-20">
+      <span class="inline-block rounded-full bg-mint px-3 py-1 text-xs font-semibold text-emerald-900">For creators who talk to camera</span>
+      <h1 class="mx-auto mt-5 max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
+        Sound sharper in your <span class="text-primary">next video</span>
+      </h1>
+      <p class="mx-auto mt-4 max-w-xl text-lg text-stone-600">
+        Record a take. We'll point to the exact moments where you ramble, repeat yourself or say "um", and tell you what to say instead.
+      </p>
+      <div class="mt-8 flex flex-wrap justify-center gap-3">
+        <a href="#record" class="rounded-xl bg-primary px-6 py-3 font-semibold text-white shadow-sm hover:bg-emerald-600">Record a take</a>
+        <button @click="showSample" class="rounded-xl border border-warm bg-white px-6 py-3 font-semibold hover:border-stone-300">See a sample report</button>
+      </div>
+      <div class="mx-auto mt-14 grid max-w-3xl gap-4 text-left sm:grid-cols-3">
+        <div v-for="f in features" :key="f.title" class="rounded-2xl border border-warm bg-white p-5">
+          <div class="text-2xl">{{ f.icon }}</div>
+          <h3 class="mt-2 font-semibold">{{ f.title }}</h3>
+          <p class="mt-1 text-sm text-stone-600">{{ f.text }}</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Record / upload -->
+    <section id="record" class="scroll-mt-20 py-10">
+      <h2 class="text-2xl font-bold">1. Record or upload</h2>
+      <p class="mt-1 text-stone-600">Talk for 30 seconds to a few minutes, like you would in a video.</p>
+
+      <div class="mt-6 rounded-2xl border border-warm bg-white p-6 sm:p-8">
+        <!-- Waveform -->
+        <canvas ref="wave" class="h-24 w-full rounded-xl bg-paper"></canvas>
+
+        <div class="mt-6 flex flex-col items-center gap-4">
+          <div class="font-mono text-3xl tabular-nums" :class="state === 'recording' ? 'text-primary' : 'text-stone-400'">{{ clock }}</div>
+
+          <!-- Idle / recorded: start; recording: stop -->
+          <button v-if="state !== 'recording'" @click="startRecording" :disabled="busy"
+                  class="flex items-center gap-2 rounded-full bg-primary px-7 py-3 font-semibold text-white shadow-sm hover:bg-emerald-600 disabled:opacity-50">
+            <span class="h-3 w-3 rounded-full bg-white"></span>
+            {{ audioBlob ? 'Record again' : 'Start recording' }}
+          </button>
+          <button v-else @click="stopRecording"
+                  class="flex items-center gap-2 rounded-full bg-stone-800 px-7 py-3 font-semibold text-white hover:bg-stone-900">
+            <span class="h-3 w-3 rounded-sm bg-white"></span> Stop
+          </button>
+
+          <label v-if="state !== 'recording'" class="cursor-pointer text-sm text-stone-600 underline decoration-warm underline-offset-4 hover:text-stone-900">
+            or upload an audio file
+            <input type="file" accept="audio/*" class="hidden" @change="pickFile">
+          </label>
+        </div>
+
+        <!-- Ready to analyse -->
+        <div v-if="audioBlob && state !== 'recording'" class="mt-6 flex flex-col items-center gap-4 border-t border-warm pt-6 sm:flex-row sm:justify-between">
+          <div class="w-full sm:w-auto">
+            <div class="mb-1 truncate text-sm text-stone-500">{{ audioName }}</div>
+            <audio :src="audioUrl" controls class="w-full sm:w-72"></audio>
+          </div>
+          <button @click="analyse" :disabled="busy"
+                  class="w-full rounded-xl bg-primary px-6 py-3 font-semibold text-white hover:bg-emerald-600 disabled:opacity-60 sm:w-auto">
+            {{ busy ? 'Uploading…' : 'Get feedback' }}
+          </button>
+        </div>
+
+        <!-- Error -->
+        <div v-if="error" class="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          {{ error }}
+          <button @click="showSample" class="ml-1 font-semibold underline">See a sample report instead</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Feedback report -->
+    <section id="feedback" class="scroll-mt-20 py-10">
+      <h2 class="text-2xl font-bold">2. Your feedback</h2>
+
+      <div v-if="!report" class="mt-6 rounded-2xl border border-dashed border-warm p-10 text-center text-stone-500">
+        Your report will appear here after you record a take.
+      </div>
+
+      <div v-else class="mt-6 space-y-6">
+        <p v-if="report.isSample" class="rounded-xl bg-mint/50 px-4 py-2 text-sm text-emerald-900">
+          This is sample feedback. Real analysis will be shown here once the backend supports it.
+        </p>
+
+        <!-- Stats -->
+        <div class="grid gap-4 sm:grid-cols-4">
+          <div v-for="s in report.stats" :key="s.label" class="rounded-2xl border border-warm bg-white p-5">
+            <div class="text-sm text-stone-500">{{ s.label }}</div>
+            <div class="mt-1 text-3xl font-bold" :class="s.color">{{ s.value }}</div>
+            <div class="mt-1 text-xs text-stone-500">{{ s.note }}</div>
+          </div>
+        </div>
+
+        <!-- Fillers + repeated words -->
+        <div class="grid gap-4 md:grid-cols-2">
+          <div class="rounded-2xl border border-warm bg-white p-5">
+            <h3 class="font-semibold">Filler words</h3>
+            <ul class="mt-4 space-y-3">
+              <li v-for="f in report.fillers" :key="f.word">
+                <div class="flex justify-between text-sm"><span>"{{ f.word }}"</span><span class="font-semibold">{{ f.count }}×</span></div>
+                <div class="mt-1 h-2 rounded-full bg-mint/60">
+                  <div class="h-2 rounded-full bg-primary" :style="{ width: (f.count / maxFiller * 100) + '%' }"></div>
+                </div>
+              </li>
+            </ul>
+          </div>
+          <div class="rounded-2xl border border-warm bg-white p-5">
+            <h3 class="font-semibold">Repeated words</h3>
+            <ul class="mt-4 divide-y divide-warm">
+              <li v-for="r in report.repeated" :key="r.word" class="py-2.5 text-sm">
+                <span class="font-semibold">"{{ r.word }}"</span> <span class="text-stone-500">used {{ r.count }}×</span>
+                <div class="mt-1 flex flex-wrap gap-1.5">
+                  <span class="text-stone-500">Try:</span>
+                  <span v-for="alt in r.alternatives" :key="alt" class="rounded-md bg-accent/10 px-2 py-0.5 text-cyan-800">{{ alt }}</span>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Moments -->
+        <div class="rounded-2xl border border-warm bg-white p-5">
+          <h3 class="font-semibold">Moments to fix</h3>
+          <ul class="mt-4 space-y-4">
+            <li v-for="m in report.moments" :key="m.time" class="rounded-xl border border-warm p-4">
+              <div class="flex flex-wrap items-center gap-2 text-xs">
+                <span class="rounded-md bg-stone-100 px-2 py-0.5 font-mono">{{ m.time }}</span>
+                <span class="rounded-md px-2 py-0.5 font-semibold" :class="tagClass[m.type]">{{ m.type }}</span>
+              </div>
+              <blockquote class="mt-3 border-l-4 border-warm pl-3 italic text-stone-600">"{{ m.quote }}"</blockquote>
+              <p class="mt-3 text-sm">{{ m.issue }}</p>
+              <p class="mt-2 rounded-lg bg-mint/40 px-3 py-2 text-sm text-emerald-900"><span class="font-semibold">Try instead:</span> {{ m.fix }}</p>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Progress -->
+    <section id="progress" class="scroll-mt-20 py-10">
+      <h2 class="text-2xl font-bold">3. Your progress</h2>
+      <p class="mt-1 text-stone-600">Your last {{ history.length }} recordings. <span v-if="!uploadedAny" class="text-stone-500">(sample data)</span></p>
+
+      <div class="mt-6 grid gap-4 md:grid-cols-2">
+        <div class="rounded-2xl border border-warm bg-white p-5">
+          <h3 class="font-semibold">Filler words per minute</h3>
+          <p class="text-xs text-stone-500">Lower is better</p>
+          <div class="mt-4 flex h-40 items-end gap-3">
+            <div v-for="h in history" :key="h.label" class="flex flex-1 flex-col items-center gap-1">
+              <span class="text-xs font-semibold">{{ h.fillersPerMin }}</span>
+              <div class="w-full rounded-t-md bg-primary" :style="{ height: (h.fillersPerMin / maxFpm * 100) + '%' }"></div>
+              <span class="text-xs text-stone-500">{{ h.label }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="rounded-2xl border border-warm bg-white p-5">
+          <h3 class="font-semibold">Speaking pace (words/min)</h3>
+          <p class="text-xs text-stone-500">Aim for 140–160</p>
+          <div class="relative mt-4 flex h-40 items-end gap-3">
+            <div class="absolute inset-x-0 rounded bg-mint/40" :style="{ bottom: (140 / maxPace * 100) + '%', height: (20 / maxPace * 100) + '%' }"></div>
+            <div v-for="h in history" :key="h.label" class="relative flex flex-1 flex-col items-center gap-1">
+              <span class="text-xs font-semibold">{{ h.pace }}</span>
+              <div class="w-full rounded-t-md bg-accent" :style="{ height: (h.pace / maxPace * 100) + '%' }"></div>
+              <span class="text-xs text-stone-500">{{ h.label }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p v-if="trend" class="mt-4 rounded-xl bg-mint/50 px-4 py-3 text-sm text-emerald-900">{{ trend }}</p>
+    </section>
+  </main>
+
+  <footer class="mt-10 border-t border-warm py-8 text-center text-sm text-stone-500">
+    OutSpoken · HackUCD sample
+  </footer>
+</div>
+
+<script>
+  // Backend from this repo (server.js). Change for Cloud Run.
+  const API_URL = 'http://localhost:8080';
+
+  // Placeholder until the backend has an analysis endpoint
+  const SAMPLE_REPORT = {
+    stats: [
+      { label: 'Filler words', value: '14', note: '4.7 per minute', color: 'text-stone-800' },
+      { label: 'Pace', value: '172', note: 'words/min · a bit fast', color: 'text-cyan-700' },
+      { label: 'Clarity', value: '7/10', note: 'Strong middle, weak opening', color: 'text-primary' },
+      { label: 'Length', value: '3:00', note: '512 words', color: 'text-stone-800' },
+    ],
+    fillers: [
+      { word: 'um', count: 6 },
+      { word: 'like', count: 4 },
+      { word: 'you know', count: 3 },
+      { word: 'basically', count: 1 },
+    ],
+    repeated: [
+      { word: 'really', count: 9, alternatives: ['genuinely', 'seriously', '(cut it)'] },
+      { word: 'super', count: 5, alternatives: ['very', 'incredibly', 'remarkably'] },
+      { word: 'so', count: 7, alternatives: ['start with the point'] },
+    ],
+    moments: [
+      {
+        time: '0:02', type: 'Weak opening',
+        quote: 'Hey guys, um, so today I wanted to, like, kind of talk about something…',
+        issue: 'The first 8 seconds say nothing about the topic. Viewers decide whether to stay in the first few seconds.',
+        fix: 'Open with the hook: "Three morning habits doubled my focus. Here\'s the one that surprised me."',
+      },
+      {
+        time: '0:47', type: 'Filler words',
+        quote: 'It\'s, um, it\'s really, like, really important to, you know, stay consistent.',
+        issue: 'Three fillers and a repeated "really" in one sentence bury the point.',
+        fix: 'Pause instead of filling: "Consistency matters more than intensity."',
+      },
+      {
+        time: '1:32', type: 'Rambling',
+        quote: 'And that\'s kind of why, I mean, it depends, but for me anyway it sort of worked out…',
+        issue: 'The point trails off without landing.',
+        fix: 'Finish with one clear sentence, then stop: "For me, that one change worked."',
+      },
+    ],
+  };
+
+  const SAMPLE_HISTORY = [
+    { label: 'Take 1', fillersPerMin: 8.2, pace: 185 },
+    { label: 'Take 2', fillersPerMin: 6.9, pace: 178 },
+    { label: 'Take 3', fillersPerMin: 5.6, pace: 176 },
+    { label: 'Take 4', fillersPerMin: 4.7, pace: 172 },
+  ];
+
+  const { createApp } = Vue;
+
+  createApp({
+    data() {
+      return {
+        navLinks: [
+          { href: '#record', label: 'Record' },
+          { href: '#feedback', label: 'Feedback' },
+          { href: '#progress', label: 'Progress' },
+        ],
+        features: [
+          { icon: '🎙️', title: 'Record or upload', text: 'Use your mic or drop in a voice memo.' },
+          { icon: '🔍', title: 'Specific feedback', text: 'Every note quotes what you said and shows a better way.' },
+          { icon: '📈', title: 'Track progress', text: 'See your filler words drop take after take.' },
+        ],
+        tagClass: {
+          'Weak opening': 'bg-amber-100 text-amber-800',
+          'Filler words': 'bg-accent/15 text-cyan-800',
+          'Rambling': 'bg-stone-200 text-stone-700',
+        },
+        state: 'idle', // idle | recording | ready
+        busy: false,
+        error: '',
+        seconds: 0,
+        audioBlob: null,
+        audioUrl: '',
+        audioName: '',
+        report: null,
+        history: SAMPLE_HISTORY.map((h) => ({ ...h })),
+        uploadedAny: false,
+      };
+    },
+    computed: {
+      clock() {
+        const m = Math.floor(this.seconds / 60);
+        const s = String(this.seconds % 60).padStart(2, '0');
+        return `${m}:${s}`;
+      },
+      maxFiller() { return Math.max(...(this.report?.fillers.map((f) => f.count) || [1])); },
+      maxFpm() { return Math.max(...this.history.map((h) => h.fillersPerMin)); },
+      maxPace() { return Math.max(200, ...this.history.map((h) => h.pace)); },
+      trend() {
+        const first = this.history[0], last = this.history[this.history.length - 1];
+        if (!first || first === last) return '';
+        const drop = Math.round((1 - last.fillersPerMin / first.fillersPerMin) * 100);
+        return drop > 0 ? `Nice work: ${drop}% fewer filler words than your first take.` : '';
+      },
+    },
+    mounted() {
+      this.drawIdleWave();
+      window.addEventListener('resize', () => this.state !== 'recording' && this.drawIdleWave());
+    },
+    methods: {
+      async startRecording() {
+        this.error = '';
+        let stream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch {
+          this.error = 'Could not use your microphone. Allow mic access in your browser, or upload a file instead.';
+          return;
+        }
+        this.stream = stream;
+        this.chunks = [];
+        this.recorder = new MediaRecorder(stream);
+        this.recorder.ondataavailable = (e) => e.data.size && this.chunks.push(e.data);
+        this.recorder.onstop = () => {
+          const type = this.recorder.mimeType || 'audio/webm';
+          const ext = type.includes('mp4') ? 'm4a' : type.includes('ogg') ? 'ogg' : 'webm';
+          this.setAudio(new Blob(this.chunks, { type }), `recording.${ext}`);
+        };
+        this.recorder.start();
+        this.state = 'recording';
+        this.seconds = 0;
+        this.timer = setInterval(() => this.seconds++, 1000);
+        this.drawLiveWave(stream);
+      },
+      stopRecording() {
+        this.recorder.stop();
+        this.stream.getTracks().forEach((t) => t.stop());
+        clearInterval(this.timer);
+        cancelAnimationFrame(this.raf);
+        this.audioCtx?.close();
+        this.state = 'ready';
+        this.drawIdleWave();
+      },
+      pickFile(e) {
+        const file = e.target.files[0];
+        e.target.value = '';
+        if (!file) return;
+        this.error = '';
+        this.seconds = 0;
+        this.setAudio(file, file.name);
+        this.state = 'ready';
+      },
+      setAudio(blob, name) {
+        if (this.audioUrl) URL.revokeObjectURL(this.audioUrl);
+        this.audioBlob = blob;
+        this.audioName = name;
+        this.audioUrl = URL.createObjectURL(blob);
+      },
+      async analyse() {
+        this.busy = true;
+        this.error = '';
+        try {
+          const form = new FormData();
+          form.append('audio', this.audioBlob, this.audioName);
+          const res = await fetch(`${API_URL}/api/recordings`, { method: 'POST', body: form });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error?.message || `Upload failed (${res.status}).`);
+          // Uploaded. Analysis isn't built yet, so show sample feedback.
+          this.addToHistory();
+          this.showSample();
+        } catch (err) {
+          this.error = err instanceof TypeError
+            ? `Could not reach the server at ${API_URL}. Is the backend running?`
+            : err.message;
+        } finally {
+          this.busy = false;
+        }
+      },
+      addToHistory() {
+        if (!this.uploadedAny) this.history = [];
+        this.uploadedAny = true;
+        const prev = this.history[this.history.length - 1];
+        this.history.push({
+          label: `Take ${this.history.length + 1}`,
+          fillersPerMin: prev ? Math.max(1, +(prev.fillersPerMin * 0.85).toFixed(1)) : 6.5,
+          pace: prev ? Math.max(145, prev.pace - 5) : 175,
+        });
+        if (this.history.length > 6) this.history.shift();
+      },
+      showSample() {
+        this.report = { ...SAMPLE_REPORT, isSample: true };
+        this.$nextTick(() => document.getElementById('feedback').scrollIntoView({ behavior: 'smooth' }));
+      },
+
+      // Waveform drawing (cyan accent)
+      sizeCanvas() {
+        const c = this.$refs.wave;
+        const dpr = window.devicePixelRatio || 1;
+        c.width = c.clientWidth * dpr;
+        c.height = c.clientHeight * dpr;
+        return c;
+      },
+      drawBars(levels) {
+        const c = this.$refs.wave;
+        const ctx = c.getContext('2d');
+        ctx.clearRect(0, 0, c.width, c.height);
+        ctx.fillStyle = '#06B6D4';
+        const gap = 3 * (window.devicePixelRatio || 1);
+        const w = (c.width - gap * (levels.length - 1)) / levels.length;
+        levels.forEach((v, i) => {
+          const h = Math.max(4, v * c.height * 0.9);
+          ctx.globalAlpha = this.state === 'recording' ? 1 : 0.35;
+          ctx.fillRect(i * (w + gap), (c.height - h) / 2, w, h);
+        });
+      },
+      drawIdleWave() {
+        this.sizeCanvas();
+        this.drawBars(Array.from({ length: 48 }, (_, i) => 0.08 + 0.12 * Math.abs(Math.sin(i * 0.5))));
+      },
+      drawLiveWave(stream) {
+        this.sizeCanvas();
+        this.audioCtx = new AudioContext();
+        const analyser = this.audioCtx.createAnalyser();
+        analyser.fftSize = 128;
+        this.audioCtx.createMediaStreamSource(stream).connect(analyser);
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        const loop = () => {
+          analyser.getByteFrequencyData(data);
+          this.drawBars(Array.from(data.slice(0, 48), (v) => v / 255));
+          this.raf = requestAnimationFrame(loop);
+        };
+        loop();
+      },
+    },
+  }).mount('#app');
+</script>
+</body>
+</html>
