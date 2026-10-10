@@ -5,7 +5,7 @@ import path from 'node:path';
 import express from 'express';
 import multer from 'multer';
 import { Storage } from '@google-cloud/storage';
-import { transcribe, TranscriptionError } from './transcribe.js';
+import { transcribe, asciiDiagram, TranscriptionError } from './transcribe.js';
 import { analyze, AnalysisError } from './analyze.js';
 
 const app = express();
@@ -145,7 +145,7 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
-// Sample scripts for users to read aloud, stored as one JSON file in the bucket.
+// Prompts (speaking topics for users to talk about), stored as one JSON file in the bucket.
 // Edit prompts/scripts.json and run `npm run prompts:upload`; changes show within a minute.
 const PROMPTS_CACHE_MS = 60 * 1000;
 let promptsCache = { data: null, loadedAt: 0 };
@@ -157,10 +157,10 @@ async function loadPrompts() {
     data = await readSaved(bucket.file('prompts/scripts.json'));
   } catch (err) {
     console.error('Loading prompts failed:', err.message);
-    throw apiError(502, 'STORAGE_FAILED', 'Could not load the sample scripts. Please try again.');
+    throw apiError(502, 'STORAGE_FAILED', 'Could not load the prompts. Please try again.');
   }
   if (!Array.isArray(data?.prompts)) {
-    throw apiError(503, 'PROMPTS_UNAVAILABLE', 'Sample scripts are not available yet.');
+    throw apiError(503, 'PROMPTS_UNAVAILABLE', 'Prompts are not available yet.');
   }
   // Skip entries that weren't added with `npm run prompts:upload` (e.g. the bucket file edited by hand)
   const prompts = data.prompts.filter((p) => typeof p?.id === 'string' && Array.isArray(p.focus));
@@ -188,7 +188,7 @@ app.get('/api/prompts', async (req, res, next) => {
 app.get('/api/prompts/:id', async (req, res, next) => {
   try {
     const prompt = (await loadPrompts()).prompts.find((p) => p.id === req.params.id);
-    if (!prompt) return next(apiError(404, 'PROMPT_NOT_FOUND', 'No sample script with that id.'));
+    if (!prompt) return next(apiError(404, 'PROMPT_NOT_FOUND', 'No prompt with that id.'));
     res.json(prompt);
   } catch (err) {
     next(err);
@@ -316,7 +316,8 @@ async function getTranscript(id) {
   let recordingFile;
   try {
     const saved = await readSaved(transcriptFile);
-    if (saved) return saved;
+    // Transcripts saved before the diagram was added get one on the fly
+    if (saved) return { ...saved, diagram: saved.diagram ?? asciiDiagram(saved.words, saved.duration) };
     [[recordingFile]] = await bucket.getFiles({ prefix: `recordings/${id}.` });
   } catch (err) {
     throw storageError(err);
@@ -366,6 +367,8 @@ app.post('/api/recordings/:id/transcript', async (req, res, next) => {
 app.post('/api/recordings/:id/analysis', async (req, res, next) => {
   const { id } = req.params;
   if (!RECORDING_ID.test(id)) return next(apiError(404, 'RECORDING_NOT_FOUND', 'No recording with that id.'));
+  // Optional: the id of the prompt (speaking topic) the user was given, from GET /api/prompts
+  const promptId = req.body?.promptId ?? null;
 
   const analysisFile = bucket.file(`analyses/${id}.json`);
   try {
@@ -375,7 +378,14 @@ app.post('/api/recordings/:id/analysis', async (req, res, next) => {
     } catch (err) {
       throw storageError(err);
     }
-    if (saved) return res.json(saved);
+    // Reuse the saved report only if it was made for the same prompt
+    if (saved && (saved.promptId ?? null) === promptId) return res.json(saved);
+
+    let topic;
+    if (promptId !== null) {
+      topic = (await loadPrompts()).prompts.find((p) => p.id === promptId)?.script;
+      if (!topic) throw apiError(404, 'PROMPT_NOT_FOUND', 'No prompt with that id.');
+    }
 
     const transcript = await getTranscript(id);
     let result;
@@ -383,6 +393,7 @@ app.post('/api/recordings/:id/analysis', async (req, res, next) => {
       result = await analyze(transcript, {
         apiKey: process.env.OPENROUTER_API_KEY,
         signal: AbortSignal.timeout(ANALYSIS_TIMEOUT_SECONDS * 1000),
+        topic,
       });
     } catch (err) {
       if (!(err instanceof AnalysisError)) throw err;
@@ -392,7 +403,7 @@ app.post('/api/recordings/:id/analysis', async (req, res, next) => {
         : apiError(502, 'ANALYSIS_FAILED', 'Could not analyse the recording. Please try again.');
     }
 
-    const analysis = { recordingId: id, ...result, createdAt: new Date().toISOString() };
+    const analysis = { recordingId: id, promptId, ...result, createdAt: new Date().toISOString() };
     await saveResult(analysisFile, analysis);
     res.json(analysis);
   } catch (err) {

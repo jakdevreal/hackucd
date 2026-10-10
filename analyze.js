@@ -1,6 +1,7 @@
 // Speech analysis: exact measurements from the word timestamps, plus coaching from
 // an LLM via OpenRouter. Every coaching item must quote the transcript; quotes we
 // can't find are dropped, and found ones get their real timestamps.
+import { asciiDiagram } from './transcribe.js';
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 const MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-haiku-5.5';
@@ -127,6 +128,10 @@ const CATEGORIES = ['filler', 'repetition', 'opening', 'clarity', 'structure', '
 
 const SYSTEM_PROMPT = `You are a speaking coach for social media creators who talk to camera. You get a transcript of one take, split into numbered sentences with timestamps, plus measurements computed from it. Give coaching the creator can act on before their next video.
 
+You may also get:
+- The topic the creator was given to talk about in their own words. Comment on whether they answered it and stayed on it, for example an opening that gets to the topic late or a tangent away from it. Coach the delivery of what they actually said; there is no script to compare against.
+- A timing diagram of the take: each word followed by "=" marks for how long it was held (one per eighth of a second, at most 12), "~|" for a short gap, and "~1.25s~|" for a silence of 0.3 seconds or more. Use it to judge rhythm: rushed stretches with no gaps, drawn-out words, and hesitations before or after particular words. Quote words from the transcript, never from the diagram.
+
 What to look for:
 - Filler words and verbal habits: "um", "like", "you know", "basically", "so" at the start of sentences, sentences that trail off. Judge words like "like" and "so" in context; "I like coffee" is not a filler.
 - Repetitive vocabulary: overused words and phrases. Suggest specific alternatives that fit the sentence.
@@ -175,7 +180,7 @@ const RESPONSE_SCHEMA = {
 
 const clock = (seconds) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 
-function buildPrompt(sentences, stats) {
+function buildPrompt(sentences, stats, diagram, topic) {
   const measurements = {
     durationSeconds: stats.durationSeconds,
     wordsPerMinute: stats.wordsPerMinute,
@@ -185,7 +190,12 @@ function buildPrompt(sentences, stats) {
     sentenceOpeners: stats.sentenceOpeners,
   };
   const transcript = sentences.map((s) => `[${s.index}] (${clock(s.start)}) ${s.text}`).join('\n');
-  return `Measurements:\n${JSON.stringify(measurements, null, 2)}\n\nTranscript:\n${transcript}`;
+  return [
+    `Topic the creator was given: ${topic || 'none (they chose what to talk about)'}`,
+    `Measurements:\n${JSON.stringify(measurements, null, 2)}`,
+    `Transcript:\n${transcript}`,
+    `Timing diagram:\n${diagram}`,
+  ].join('\n\n');
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -267,15 +277,17 @@ function locateQuote(quote, sentenceNumber, sentences, words, tokens) {
 /**
  * Analyses a transcript ({ text, duration, words }) and returns
  * { summary, strengths, topPriorities, feedback, stats, model }.
+ * `topic` is the speaking topic the creator was given, if any.
  * Throws AnalysisError; `signal` aborts everything (used for the overall timeout).
  */
-export async function analyze(transcript, { apiKey, signal }) {
+export async function analyze(transcript, { apiKey, signal, topic }) {
   if (!apiKey) throw new Error('OPENROUTER_API_KEY is not set');
   const { sentences, stats } = measure(transcript);
+  const diagram = transcript.diagram || asciiDiagram(transcript.words, transcript.duration);
 
   let coaching;
   try {
-    coaching = await requestCoaching(buildPrompt(sentences, stats), apiKey, signal);
+    coaching = await requestCoaching(buildPrompt(sentences, stats, diagram, topic), apiKey, signal);
   } catch (err) {
     if (signal.aborted) throw new AnalysisError('timeout', 'Analysis timed out', { cause: err });
     throw err;

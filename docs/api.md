@@ -131,12 +131,15 @@ The transcript is saved to Cloud Storage. Calling this again for the same record
     { "word": "Hey", "start": 0.12, "end": 0.34 },
     { "word": "everyone,", "start": 0.36, "end": 0.81 }
   ],
+  "diagram": "00:00:00.000 |Hey==|everyone,====|~0.42s~|so=|~|today==| 00:00:42.700",
   "model": "elevenlabs/scribe-v2",
   "createdAt": "2026-10-10T11:30:00.000Z"
 }
 ```
 
 `duration`, `start` and `end` are in seconds from the start of the recording. Use them to highlight words or jump the audio player to a moment.
+
+`diagram` is the take as one line of text (the same format as the team's original `transcribe_video.py`): each word followed by `=` marks for how long it was held (one per 1/8 s, at most 12), `~|` for a short gap and `~0.42s~|` for a silence of 0.3 s or more. The analysis model reads it to judge rhythm and hesitations. It is for display or debugging only; use `words` for anything precise.
 
 **Errors**
 
@@ -151,7 +154,15 @@ The transcript is saved to Cloud Storage. Calling this again for the same record
 
 ## POST /api/recordings/:id/analysis
 
-The coaching report for a recording, and the one call the "Get feedback" button needs after uploading. No request body. If the recording hasn't been transcribed yet, this transcribes it first, so you don't need to call `/transcript` separately. Expect about 20 s for a 1-minute take; show a loading state.
+The coaching report for a recording, and the one call the "Get feedback" button needs after uploading. If the recording hasn't been transcribed yet, this transcribes it first, so you don't need to call `/transcript` separately. Expect about 20 s for a 1-minute take; show a loading state.
+
+**Request body** (JSON, optional):
+
+```json
+{ "promptId": "explain-a-concept" }
+```
+
+`promptId` is the `id` of the prompt from `GET /api/prompts` that the user was given before recording. The server looks up the topic and passes it to the AI, which then also says whether the user answered the topic and stayed on it. Leave the body out if the user recorded without a prompt.
 
 The result is saved. Calling it again returns the saved report instantly without re-analysing, so it's safe to retry and safe to call when re-opening a past recording.
 
@@ -160,6 +171,7 @@ The result is saved. Calling it again returns the saved report instantly without
 ```json
 {
   "recordingId": "8e5b7ea0-2d7b-4b0e-ae55-389b9e892465",
+  "promptId": "explain-a-concept",
   "summary": "You have a solid, specific idea here... Tighten the opening, cut the filler, and close with a clear takeaway.",
   "strengths": ["You gave concrete details, like waking at 5 AM, which make the advice feel real."],
   "topPriorities": ["Open by stating the topic and the payoff in your first sentence, with no greeting preamble."],
@@ -196,6 +208,7 @@ The result is saved. Calling it again returns the saved report instantly without
 - **`feedback`**: 0 to 8 items, most important first. `category` is one of `filler`, `repetition`, `opening`, `clarity`, `structure`, `pacing`, `ending`. `quote` is the exact wording from the transcript, and `start`/`end` are seconds into the recording: use them to highlight the words or seek the audio player. `alternatives` is filled for `repetition` items and empty for the rest.
 - **`stats`** is measured directly from the transcript, not by the AI, so it is exact and comparable between recordings (the progress-over-time view will use it). `moments` lists every occurrence with timestamps. `longPauses` are silences of 1.5 s or more.
 - **`summary`**, **`strengths`** (1-3) and **`topPriorities`** (1-3) are short text for the top of the report.
+- **`promptId`** is the prompt the report was made for, or `null`. The report is saved per recording: calling again with the same `promptId` returns it instantly, and a different `promptId` analyses the take again for that topic.
 - For the full transcript (to show the words with highlights), call `POST /api/recordings/:id/transcript`. It is already saved by then, so it returns instantly.
 
 **Errors**
@@ -203,6 +216,7 @@ The result is saved. Calling it again returns the saved report instantly without
 | Status | `code` | When |
 | --- | --- | --- |
 | 404 | `RECORDING_NOT_FOUND` | No recording with that `id` |
+| 404 | `PROMPT_NOT_FOUND` | `promptId` doesn't match any prompt |
 | 422 | `NO_SPEECH` | Recording has no detectable speech |
 | 422 | `UNREADABLE_AUDIO` | File could not be decoded; record again |
 | 502 | `ANALYSIS_FAILED` | AI service error or unusable reply; safe to retry |

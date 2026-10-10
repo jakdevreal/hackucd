@@ -119,7 +119,7 @@ async function mapLimit(items, limit, fn) {
 
 /**
  * Transcribes the audio at `source`, writing temporary pieces into `workDir`.
- * Returns { text, duration, words: [{ word, start, end }], model }, times in seconds.
+ * Returns { text, duration, words: [{ word, start, end }], diagram, model }, times in seconds.
  * Throws TranscriptionError; `signal` aborts everything (used for the overall timeout).
  */
 export async function transcribe(source, workDir, { apiKey, signal }) {
@@ -137,10 +137,12 @@ export async function transcribe(source, workDir, { apiKey, signal }) {
           end: round(w.end + chunk.start),
         })),
     );
+    const duration = round(chunks.reduce((sum, c) => sum + c.duration, 0));
     return {
       text: results.map((r) => r.text.trim()).filter(Boolean).join(' '),
-      duration: round(chunks.reduce((sum, c) => sum + c.duration, 0)),
+      duration,
       words,
+      diagram: asciiDiagram(words, duration),
       model: MODEL,
     };
   } catch (err) {
@@ -150,3 +152,36 @@ export async function transcribe(source, workDir, { apiKey, signal }) {
 }
 
 const round = (seconds) => Math.round(seconds * 1000) / 1000;
+
+// 75.5 -> "00:01:15.500"
+function formatTimestamp(seconds) {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const rest = (seconds % 60).toFixed(3).padStart(6, '0');
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${rest}`;
+}
+
+/**
+ * The transcript as one text strip, ported from transcribe_video.py's ascii_diagram:
+ * each word is followed by '=' marks for how long it was held (one per 1/8 s, at most 12),
+ * '~|' marks a short gap, and '~1.25s~|' a gap of 0.3 s or more. For example:
+ * 00:00:00.000 |So==|um===|~0.85s~|today===|I=|~|wanted===| 00:00:04.200
+ */
+export function asciiDiagram(words, duration) {
+  const parts = [formatTimestamp(0), ' |'];
+  let previousEnd = 0;
+  for (const w of words) {
+    const label = String(w.word ?? '').trim().replaceAll('|', '/');
+    if (!Number.isFinite(w.start) || !Number.isFinite(w.end) || !label) continue;
+    const gap = Math.max(0, w.start - previousEnd);
+    if (gap >= 0.3) parts.push(`~${gap.toFixed(2)}s~|`);
+    else if (gap >= 0.05) parts.push('~|');
+    parts.push(`${label}${'='.repeat(Math.min(12, Math.round(Math.max(0, w.end - w.start) * 8)))}|`);
+    previousEnd = Math.max(previousEnd, w.end);
+  }
+  const trailing = Math.max(0, duration - previousEnd);
+  if (trailing >= 0.3) parts.push(`~${trailing.toFixed(2)}s~`);
+  else if (trailing >= 0.05) parts.push('~');
+  parts.push(' ', formatTimestamp(duration));
+  return parts.join('');
+}
