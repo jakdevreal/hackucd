@@ -42,3 +42,8 @@ We own the **backend and storage**. Another part of the team owns the frontend.
 - Handle the failures a live demo will hit: oversized uploads, unsupported audio formats, model timeouts and malformed model output. Return a clear error the frontend can show.
 - If a requirement is unclear or a decision below is still open, ask rather than guess.
 
+## Repository
+
+- GitHub repo: `jackdevreal/hackucd`
+- We work as GitHub user `mrcheesechase`, which has access to this repo. Use this account for commits, pushes and pull requests.
+- The repo is shared with three teammates. Work on a branch, and never force-push or rewrite history on `main`.
