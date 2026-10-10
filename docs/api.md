@@ -18,57 +18,103 @@ Checks that the server is up.
 { "status": "ok" }
 ```
 
-## POST /api/recordings
+## Uploading a recording
 
-Uploads one audio recording and saves it to Cloud Storage. Send it as `multipart/form-data` with the file in the field **`audio`**.
+Use this for both in-browser recordings (`MediaRecorder`) and audio files the user picks from their device (`<input type="file" accept="audio/*">`).
 
-Use it both for in-browser recordings and for audio files the user picks from their device.
+Accepted formats: **webm** (Chrome/Firefox recordings), **ogg**, **m4a** (Safari recordings, phone voice memos), **mp3**, **wav**. **Max size: 128 MB.** Video files are rejected.
 
-Accepted formats: **webm** (Chrome/Firefox recordings), **ogg**, **m4a** (Safari recordings, phone voice memos), **mp3**, **wav**. Max size: 25 MB. Video files are rejected.
+The server checks the file's actual contents, not the type the browser reports, so files with a blank or wrong type (common on phones) still work, and non-audio files renamed to `.mp3` are rejected.
 
-The server checks the file's actual contents, not the type the browser reports, so files with a blank or wrong type (common on phones) still work, and non-audio files renamed to `.mp3` are rejected. The `contentType` in the response is the detected format (`audio/webm`, `audio/ogg`, `audio/mp4`, `audio/mpeg` or `audio/wav`).
-
-For a file picker, `<input type="file" accept="audio/*">` is enough.
-
-Recording in the browser with `MediaRecorder`:
+The file goes **straight from the browser to Cloud Storage**, not through our server. Cloud Run rejects requests over 32 MB, so this is the only way to accept files up to 128 MB. It takes three calls:
 
 ```js
-const form = new FormData();
-form.append('audio', blob, 'recording.webm'); // blob from MediaRecorder chunks
-const res = await fetch(`${API_URL}/api/recordings`, { method: 'POST', body: form });
-const data = await res.json(); // on error: data.error.message is safe to show the user
+// file: a Blob from MediaRecorder, or a File from <input type="file">
+// 1. Ask for an upload link
+let res = await fetch(`${API_URL}/api/recordings/upload-url`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ contentType: file.type, fileName: file.name, sizeBytes: file.size }),
+});
+const link = await res.json();
+if (!res.ok) throw link.error; // e.g. FILE_TOO_LARGE before uploading anything
+
+// 2. Upload the file to Cloud Storage. Send link.headers exactly as given.
+const put = await fetch(link.uploadUrl, { method: link.method, headers: link.headers, body: file });
+if (!put.ok) throw { message: 'Upload failed. Please try again.' }; // Cloud Storage error, not our JSON shape
+
+// 3. Tell the backend the upload finished; it checks the file and returns the recording
+res = await fetch(`${API_URL}/api/recordings/${link.id}/complete`, { method: 'POST' });
+const recording = await res.json(); // on error: recording.error.message is safe to show
 ```
 
-Do not set the `Content-Type` header yourself; the browser adds the multipart boundary.
+For upload progress on large files, do step 2 with `XMLHttpRequest` and `xhr.upload.onprogress` instead of `fetch`.
+
+### POST /api/recordings/upload-url
+
+**Request body** (JSON, all fields optional but send them when you have them):
+
+| Field | Example | Used for |
+| --- | --- | --- |
+| `contentType` | `"audio/webm;codecs=opus"` | `file.type`; may be `""` |
+| `fileName` | `"memo.m4a"` | Rejecting video files early |
+| `sizeBytes` | `5242880` | Rejecting files over 128 MB before uploading |
 
 **Response 201**
 
 ```json
 {
-  "id": "6c0089fd-ea31-4083-a2de-62e14fe66cc8",
-  "objectPath": "recordings/6c0089fd-ea31-4083-a2de-62e14fe66cc8.wav",
-  "contentType": "audio/wav",
-  "sizeBytes": 32044,
-  "createdAt": "2026-10-10T09:44:55.421Z"
+  "id": "8e5b7ea0-2d7b-4b0e-ae55-389b9e892465",
+  "uploadUrl": "https://storage.googleapis.com/hackucd-storage/uploads/8e5b...?X-Goog-Signature=...",
+  "method": "PUT",
+  "headers": { "Content-Type": "audio/webm;codecs=opus", "x-goog-content-length-range": "1,134217728" },
+  "expiresAt": "2026-10-10T10:48:35.573Z"
 }
 ```
 
-Keep `id`: later endpoints (analysis) will take it.
+The link works for 15 minutes. Cloud Storage refuses the upload if the headers differ from `headers` or the file is over 128 MB.
+
+**Errors**: 413 `FILE_TOO_LARGE`, 415 `UNSUPPORTED_FORMAT` (video), 400 `EMPTY_FILE`, 502 `STORAGE_FAILED`.
+
+### POST /api/recordings/:id/complete
+
+Call after the upload to Cloud Storage succeeds. No request body. Safe to retry: calling it again returns the same recording.
+
+**Response 201**
+
+```json
+{
+  "id": "8e5b7ea0-2d7b-4b0e-ae55-389b9e892465",
+  "objectPath": "recordings/8e5b7ea0-2d7b-4b0e-ae55-389b9e892465.webm",
+  "contentType": "audio/webm",
+  "sizeBytes": 151718,
+  "createdAt": "2026-10-10T10:33:39.131Z"
+}
+```
+
+`contentType` is the detected format (`audio/webm`, `audio/ogg`, `audio/mp4`, `audio/mpeg` or `audio/wav`). Keep `id`: the transcript and analysis endpoints take it.
 
 **Errors**
 
 | Status | `code` | When |
 | --- | --- | --- |
-| 400 | `MISSING_FILE` | No file in field `audio` |
+| 404 | `UPLOAD_NOT_FOUND` | Nothing was uploaded for that `id` (step 2 failed or was skipped) |
 | 400 | `EMPTY_FILE` | File is 0 bytes |
-| 400 | `BAD_UPLOAD` | Wrong field name or more than one file |
-| 413 | `FILE_TOO_LARGE` | Over 25 MB |
-| 415 | `UNSUPPORTED_FORMAT` | Video file, or contents are not one of the formats above |
-| 502 | `STORAGE_FAILED` | Cloud Storage write failed; safe to retry |
+| 413 | `FILE_TOO_LARGE` | Over 128 MB |
+| 415 | `UNSUPPORTED_FORMAT` | Contents are not one of the formats above |
+| 502 | `STORAGE_FAILED` | Cloud Storage error; safe to retry |
+
+A rejected file is deleted. Ask the user for a different file and start again from step 1.
+
+### POST /api/recordings (small files only)
+
+The original one-call upload: `multipart/form-data` with the file in field **`audio`**. Same checks, same 201 response as `/complete`. Once deployed to Cloud Run it **only works for files under 32 MB**, so the frontend should use the three-step flow above. It is kept for quick testing with curl.
+
+Errors: 400 `MISSING_FILE`, 400 `EMPTY_FILE`, 400 `BAD_UPLOAD` (wrong field name or more than one file), 413 `FILE_TOO_LARGE`, 415 `UNSUPPORTED_FORMAT`, 502 `STORAGE_FAILED`.
 
 ## POST /api/recordings/:id/transcript
 
-Transcribes a recording uploaded with `POST /api/recordings`, using its `id`. No request body. This can take several seconds (longer for long recordings, up to a 240 s limit), so show a loading state.
+Transcribes a recording uploaded with `POST /api/recordings`, using its `id`. No request body. This can take several seconds: about 4 s for a short clip and 40 s for 5 minutes of audio, with a 240 s limit. Show a loading state.
 
 The transcript is saved to Cloud Storage. Calling this again for the same recording returns the saved transcript instantly, without transcribing again. Retrying after an error is safe.
 
@@ -103,4 +149,4 @@ The transcript is saved to Cloud Storage. Calling this again for the same record
 
 ## Dev test page
 
-`GET /dev/record.html` is a bare page for recording from the mic (or picking a file) and uploading it. It is for backend testing only, not part of the product.
+`GET /dev/record.html` is a bare page for recording from the mic (or picking a file), uploading it with the three-step flow, and transcribing it. It is for backend testing only, not part of the product.

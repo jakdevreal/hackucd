@@ -63,15 +63,30 @@
 
     $('file').onchange = (e) => e.target.files[0] && setBlob(e.target.files[0]);
 
+    // Same flow the real frontend should use: get a link, upload straight to Cloud Storage, then complete
     $('upload').onclick = async () => {
-      const form = new FormData();
-      const ext = { 'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mp4': 'm4a' }[blob.type.split(';')[0]] || 'audio';
-      form.append('audio', blob, blob.name || 'recording.' + ext);
-      $('out').textContent = 'Uploading…';
-      const res = await fetch('/api/recordings', { method: 'POST', body: form });
-      const data = await res.json();
-      $('out').textContent = res.status + '\n' + JSON.stringify(data, null, 2);
-      recordingId = data.id;
+      const show = (step, res, data) => ($('out').textContent = `${step}: ${res.status}\n` + JSON.stringify(data, null, 2));
+      const fileName = blob.name || 'recording';
+      const started = Date.now();
+
+      $('out').textContent = '1/3 Getting upload link…';
+      let res = await fetch('/api/recordings/upload-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentType: blob.type, fileName, sizeBytes: blob.size }),
+      });
+      let data = await res.json();
+      if (!res.ok) return show('upload-url', res, data);
+
+      $('out').textContent = `2/3 Uploading ${(blob.size / 1024 / 1024).toFixed(1)} MB to Cloud Storage…`;
+      const put = await fetch(data.uploadUrl, { method: data.method, headers: data.headers, body: blob });
+      if (!put.ok) return ($('out').textContent = `Cloud Storage upload: ${put.status}\n` + (await put.text()));
+
+      $('out').textContent = '3/3 Checking the file…';
+      res = await fetch(`/api/recordings/${data.id}/complete`, { method: 'POST' });
+      data = await res.json();
+      show(`complete (${((Date.now() - started) / 1000).toFixed(1)}s total)`, res, data);
+      recordingId = res.ok && data.id;
       $('transcribe').disabled = !recordingId;
     };
 

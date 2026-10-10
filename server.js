@@ -12,7 +12,9 @@ import { Storage } from '@google-cloud/storage';
 const app = express();
 const PORT = process.env.PORT || 8080; // Cloud Run injects PORT
 const BUCKET = process.env.GCS_BUCKET || 'hackucd-storage';
-const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB) || 25;
+const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB) || 128;
+const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
+const UPLOAD_URL_MINUTES = 15;
 const TRANSCRIBE_TIMEOUT_SECONDS = Number(process.env.TRANSCRIBE_TIMEOUT_SECONDS) || 240;
 const TRANSCRIBE_SCRIPT = fileURLToPath(new URL('./transcribe_video.py', import.meta.url));
 const RECORDING_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -44,15 +46,37 @@ function detectAudioFormat(buf) {
 
 const VIDEO_EXTENSIONS = /\.(mp4|mov|m4v|avi|mkv|wmv|3gp)$/i;
 
+function isVideo(declaredType, fileName) {
+  return declaredType.startsWith('video/') || (!declaredType.startsWith('audio/') && VIDEO_EXTENSIONS.test(fileName));
+}
+
 const bucket = new Storage({ projectId: process.env.GOOGLE_CLOUD_PROJECT }).bucket(BUCKET);
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_UPLOAD_MB * 1024 * 1024, files: 1 },
+  limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 },
 });
 
 function apiError(status, code, message) {
   return Object.assign(new Error(message), { status, code, expose: true });
+}
+
+const errors = {
+  video: () => apiError(415, 'UNSUPPORTED_FORMAT', 'Video files are not supported. Upload an audio file (webm, ogg, m4a, mp3 or wav).'),
+  notAudio: () => apiError(415, 'UNSUPPORTED_FORMAT', 'This file does not look like a supported audio file. Use webm, ogg, m4a, mp3 or wav.'),
+  tooLarge: () => apiError(413, 'FILE_TOO_LARGE', `Recording is larger than ${MAX_UPLOAD_MB} MB.`),
+  empty: () => apiError(400, 'EMPTY_FILE', 'The recording is empty. Try recording again.'),
+};
+
+// Response shape shared by both upload flows
+function recordingInfo(id, metadata) {
+  return {
+    id,
+    objectPath: metadata.name,
+    contentType: metadata.contentType,
+    sizeBytes: Number(metadata.size),
+    createdAt: metadata.timeCreated,
+  };
 }
 
 // Runs transcribe_video.py (ffmpeg + OpenRouter) and returns its combined transcript.json
@@ -102,35 +126,94 @@ app.get('/api/health', (req, res) => {
 app.post('/api/recordings', upload.single('audio'), async (req, res, next) => {
   const file = req.file;
   if (!file) return next(apiError(400, 'MISSING_FILE', 'Send the recording as multipart form field "audio".'));
-  if (file.size === 0) return next(apiError(400, 'EMPTY_FILE', 'The recording is empty. Try recording again.'));
+  if (file.size === 0) return next(errors.empty());
 
   const declaredType = file.mimetype.split(';')[0].trim().toLowerCase();
-  if (declaredType.startsWith('video/') || (!declaredType.startsWith('audio/') && VIDEO_EXTENSIONS.test(file.originalname))) {
-    return next(apiError(415, 'UNSUPPORTED_FORMAT', 'Video files are not supported. Upload an audio file (webm, ogg, m4a, mp3 or wav).'));
-  }
+  if (isVideo(declaredType, file.originalname)) return next(errors.video());
 
   const format = AUDIO_FORMATS[detectAudioFormat(file.buffer)];
-  if (!format) {
-    return next(apiError(415, 'UNSUPPORTED_FORMAT', 'This file does not look like a supported audio file. Use webm, ogg, m4a, mp3 or wav.'));
-  }
-  const { contentType, ext } = format;
+  if (!format) return next(errors.notAudio());
 
   const id = randomUUID();
-  const objectPath = `recordings/${id}.${ext}`;
+  const saved = bucket.file(`recordings/${id}.${format.ext}`);
   try {
-    await bucket.file(objectPath).save(file.buffer, { contentType, resumable: false });
+    await saved.save(file.buffer, { contentType: format.contentType, resumable: false });
   } catch (err) {
     console.error('Cloud Storage upload failed:', err.message);
     return next(apiError(502, 'STORAGE_FAILED', 'Could not save the recording. Please try again.'));
   }
 
-  res.status(201).json({
-    id,
-    objectPath,
-    contentType,
-    sizeBytes: file.size,
-    createdAt: new Date().toISOString(),
-  });
+  res.status(201).json(recordingInfo(id, saved.metadata));
+});
+
+// Large-file flow: the browser uploads straight to Cloud Storage, which avoids
+// Cloud Run's 32 MB request limit. Step 1: hand out a short-lived upload link.
+app.post('/api/recordings/upload-url', async (req, res, next) => {
+  const { contentType = '', fileName = '', sizeBytes } = req.body ?? {};
+  const declaredType = String(contentType).split(';')[0].trim().toLowerCase();
+  if (isVideo(declaredType, String(fileName))) return next(errors.video());
+  if (sizeBytes === 0) return next(errors.empty());
+  if (Number(sizeBytes) > MAX_UPLOAD_BYTES) return next(errors.tooLarge());
+
+  const id = randomUUID();
+  // The browser must send exactly these headers, or Cloud Storage rejects the upload
+  const headers = {
+    'Content-Type': String(contentType).trim() || 'application/octet-stream',
+    'x-goog-content-length-range': `1,${MAX_UPLOAD_BYTES}`,
+  };
+  const expires = Date.now() + UPLOAD_URL_MINUTES * 60 * 1000;
+  try {
+    const [uploadUrl] = await bucket.file(`uploads/${id}`).getSignedUrl({
+      version: 'v4',
+      action: 'write',
+      expires,
+      contentType: headers['Content-Type'],
+      extensionHeaders: { 'x-goog-content-length-range': headers['x-goog-content-length-range'] },
+    });
+    res.status(201).json({ id, uploadUrl, method: 'PUT', headers, expiresAt: new Date(expires).toISOString() });
+  } catch (err) {
+    console.error('Signing upload URL failed:', err.message);
+    next(apiError(502, 'STORAGE_FAILED', 'Could not start the upload. Please try again.'));
+  }
+});
+
+// Step 2: after the browser's upload finishes, check the file and file it under recordings/
+app.post('/api/recordings/:id/complete', async (req, res, next) => {
+  const { id } = req.params;
+  const notFound = () => apiError(404, 'UPLOAD_NOT_FOUND', 'No finished upload with that id. Upload the file first.');
+  if (!RECORDING_ID.test(id)) return next(notFound());
+
+  const staged = bucket.file(`uploads/${id}`);
+  const reject = async (error) => {
+    await staged.delete({ ignoreNotFound: true });
+    throw error;
+  };
+  try {
+    // Completed already (e.g. a retried request): return the saved recording
+    const [[existing]] = await bucket.getFiles({ prefix: `recordings/${id}.` });
+    if (existing) return res.status(201).json(recordingInfo(id, existing.metadata));
+
+    const [exists] = await staged.exists();
+    if (!exists) throw notFound();
+
+    const [metadata] = await staged.getMetadata();
+    const size = Number(metadata.size);
+    if (size === 0) await reject(errors.empty());
+    if (size > MAX_UPLOAD_BYTES) await reject(errors.tooLarge());
+
+    const [head] = await staged.download({ start: 0, end: 63 });
+    const format = AUDIO_FORMATS[detectAudioFormat(head)];
+    if (!format) await reject(errors.notAudio());
+
+    const saved = bucket.file(`recordings/${id}.${format.ext}`);
+    await staged.move(saved);
+    const [savedMetadata] = await saved.setMetadata({ contentType: format.contentType });
+    res.status(201).json(recordingInfo(id, savedMetadata));
+  } catch (err) {
+    if (err.expose) return next(err);
+    console.error('Completing upload failed:', err.message);
+    next(apiError(502, 'STORAGE_FAILED', 'Could not save the recording. Please try again.'));
+  }
 });
 
 app.post('/api/recordings/:id/transcript', async (req, res, next) => {
@@ -203,7 +286,7 @@ app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     err =
       err.code === 'LIMIT_FILE_SIZE'
-        ? apiError(413, 'FILE_TOO_LARGE', `Recording is larger than ${MAX_UPLOAD_MB} MB.`)
+        ? errors.tooLarge()
         : apiError(400, 'BAD_UPLOAD', `Upload problem: ${err.message}. Send one file in field "audio".`);
   }
   if (!err.expose) console.error(err);
