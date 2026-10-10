@@ -414,8 +414,8 @@ app.post('/api/billing/checkout', async (req, res, next) => {
   try {
     const session = await stripeRequest('POST', 'checkout/sessions', {
       mode: 'subscription',
-      // Cards only (wallets like Apple Pay and Google Pay still show); keeps Klarna and other methods off
-      'payment_method_types[0]': 'card',
+      // Which payment methods show (e.g. cards only, no Klarna) is set in the Stripe Dashboard:
+      // Settings > Payment methods. Stripe rejects payment_method_types here.
       'line_items[0][quantity]': 1,
       'line_items[0][price_data][currency]': 'eur',
       'line_items[0][price_data][unit_amount]': plan.amount,
