@@ -159,7 +159,7 @@ The coaching report for a recording, and the one call the "Get feedback" button 
 **Request body** (JSON, optional):
 
 ```json
-{ "promptId": "explain-a-concept" }
+{ "promptId": "pick-one-concept-from-your" }
 ```
 
 `promptId` is the `id` of the prompt from `GET /api/prompts` that the user was given before recording. The server looks up the topic and passes it to the AI, which then also says whether the user answered the topic and stayed on it. Leave the body out if the user recorded without a prompt.
@@ -171,7 +171,7 @@ The result is saved. Calling it again returns the saved report instantly without
 ```json
 {
   "recordingId": "8e5b7ea0-2d7b-4b0e-ae55-389b9e892465",
-  "promptId": "explain-a-concept",
+  "promptId": "pick-one-concept-from-your",
   "summary": "You have a solid, specific idea here... Tighten the opening, cut the filler, and close with a clear takeaway.",
   "strengths": ["You gave concrete details, like waking at 5 AM, which make the advice feel real."],
   "topPriorities": ["Open by stating the topic and the payoff in your first sentence, with no greeting preamble."],
@@ -225,56 +225,43 @@ The result is saved. Calling it again returns the saved report instantly without
 
 ## GET /api/prompts
 
-Speaking topics for users to practise with. These are not scripts read word for word: the user gets a topic ("Pick one concept from your niche and explain it"), talks about it in their own words, and the analysis coaches them on what they actually said. Each topic targets a speaking habit, using the same names as the analysis `feedback` categories, so after an analysis you can suggest topics for the user's weakest area: `GET /api/prompts?focus=opening`.
-
-**Query (optional):** `focus` (one of `filler`, `repetition`, `opening`, `clarity`, `structure`, `pacing`, `ending`), `difficulty` (`beginner`, `intermediate`, `advanced`). Without them, all topics are returned.
+Speaking prompts to show the user before they record. Each one is a topic to talk about in their own words ("Pick one concept from your niche and explain it."), not a script to read. After recording, send the prompt's `id` to `POST /api/recordings/:id/analysis` as `promptId`, and the analysis also says whether they answered it.
 
 **Response 200**
 
 ```json
 {
-  "updatedAt": "2026-10-10T11:56:08.918Z",
+  "updatedAt": "2026-10-10T13:20:00.000Z",
   "prompts": [
-    {
-      "id": "example-script",
-      "title": "Example title",
-      "category": "Tutorial",
-      "difficulty": "beginner",
-      "focus": ["opening"],
-      "script": "The topic shown to the user to talk about.",
-      "tips": ["A short tip for reading it well."],
-      "wordCount": 7,
-      "estimatedSeconds": 3
-    }
+    { "id": "pick-one-concept-from-your", "text": "Pick one concept from your niche and explain it." }
   ]
 }
 ```
 
-`script` holds the topic text (the field name is kept so the response shape doesn't change). `wordCount` and `estimatedSeconds` describe the topic text itself, not how long the user should talk, so don't show them as a target length. `prompts` is empty when nothing matches the filters, or before any topics have been added.
+`text` is what to show the user. `prompts` is empty before any prompts have been added.
 
-**Errors**: 503 `PROMPTS_UNAVAILABLE` (no topics uploaded yet), 502 `STORAGE_FAILED` (safe to retry).
+**Errors**: 503 `PROMPTS_UNAVAILABLE` (no prompts uploaded yet), 502 `STORAGE_FAILED` (safe to retry).
 
 ### GET /api/prompts/:id
 
-One script by `id`, same shape as an item above. **Errors**: 404 `PROMPT_NOT_FOUND`.
+One prompt by `id`, same shape as an item above. **Errors**: 404 `PROMPT_NOT_FOUND`.
 
-### Adding or editing scripts
+### Adding or editing prompts
 
-Scripts live in `gs://hackucd-storage/prompts/scripts.json`. To change them, edit `prompts/scripts.json` in the repo and run `npm run prompts:upload`. The API picks up changes within a minute, with no redeploy.
+Prompts live in `gs://hackucd-storage/prompts/scripts.json`. To change them, edit `prompts/scripts.json` in the repo and run `npm run prompts:upload`. The API picks up changes within a minute, with no redeploy. Don't edit the bucket file by hand.
 
-Each entry in `"prompts"` needs:
+The file is just a list of texts:
 
-| Field | Rules |
-| --- | --- |
-| `id` | Unique, lowercase with dashes, e.g. `strong-outro` |
-| `title` | Short name shown to the user |
-| `category` | Free text, e.g. `Tutorial`, `Storytime` |
-| `difficulty` | `beginner`, `intermediate` or `advanced` |
-| `focus` | One or more of `filler`, `repetition`, `opening`, `clarity`, `structure`, `pacing`, `ending` |
-| `script` | The text to read aloud |
-| `tips` | List of short reading tips; `[]` if none |
+```json
+{
+  "prompts": [
+    "Introduce yourself and your channel to a brand-new viewer.",
+    "Pick one concept from your niche and explain it."
+  ]
+}
+```
 
-Don't add `wordCount` or `estimatedSeconds`; the upload fills them in. If anything is wrong, the upload refuses and lists every problem.
+The upload gives each prompt an `id` made from its first five words. Rewording the start of a prompt changes its `id`. If anything is wrong (an empty prompt, or two that start with the same five words), the upload refuses and lists every problem.
 
 ## Billing (Stripe)
 

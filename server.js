@@ -163,7 +163,7 @@ async function loadPrompts() {
     throw apiError(503, 'PROMPTS_UNAVAILABLE', 'Prompts are not available yet.');
   }
   // Skip entries that weren't added with `npm run prompts:upload` (e.g. the bucket file edited by hand)
-  const prompts = data.prompts.filter((p) => typeof p?.id === 'string' && Array.isArray(p.focus));
+  const prompts = data.prompts.filter((p) => typeof p?.id === 'string' && typeof p.text === 'string');
   if (prompts.length < data.prompts.length) {
     console.error(`Skipped ${data.prompts.length - prompts.length} malformed prompt(s); re-upload with npm run prompts:upload`);
   }
@@ -175,11 +175,7 @@ async function loadPrompts() {
 app.get('/api/prompts', async (req, res, next) => {
   try {
     const { prompts, updatedAt } = await loadPrompts();
-    const { focus, difficulty } = req.query;
-    const matching = prompts.filter(
-      (p) => (!focus || p.focus.includes(focus)) && (!difficulty || p.difficulty === difficulty),
-    );
-    res.json({ updatedAt, prompts: matching });
+    res.json({ updatedAt, prompts });
   } catch (err) {
     next(err);
   }
@@ -383,7 +379,7 @@ app.post('/api/recordings/:id/analysis', async (req, res, next) => {
 
     let topic;
     if (promptId !== null) {
-      topic = (await loadPrompts()).prompts.find((p) => p.id === promptId)?.script;
+      topic = (await loadPrompts()).prompts.find((p) => p.id === promptId)?.text;
       if (!topic) throw apiError(404, 'PROMPT_NOT_FOUND', 'No prompt with that id.');
     }
 
