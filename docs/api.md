@@ -1,6 +1,8 @@
 # API
 
-Base URL (local): `http://localhost:8080`. On Cloud Run the port comes from the `PORT` environment variable.
+Base URL (deployed): **`https://hackucd-backend-177345674775.europe-west1.run.app`**
+
+Base URL (local): `http://localhost:8080`.
 
 All responses are JSON. Errors use this shape:
 
