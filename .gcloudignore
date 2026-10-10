@@ -7,4 +7,5 @@ node_modules/
 apikey
 api-key
 stripe-key
-frontend/
+frontend/*
+!frontend/index.html

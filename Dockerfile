@@ -10,5 +10,6 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY *.js ./
 COPY dev ./dev
+COPY frontend/index.html ./frontend/
 
 CMD ["node", "server.js"]

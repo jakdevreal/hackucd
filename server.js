@@ -135,6 +135,9 @@ app.use((req, res, next) => {
   next();
 });
 
+// The frontend team's single-page app, so the whole site runs from this one service
+app.get('/', (req, res) => res.sendFile(path.resolve('frontend/index.html')));
+
 // Throwaway page for recording and uploading while the real frontend is built
 app.use('/dev', express.static('dev'));
 

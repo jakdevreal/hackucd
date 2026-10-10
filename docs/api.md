@@ -309,6 +309,10 @@ Checks a checkout from the `session_id` Stripe returned. Call it on return from 
 
 **Errors**: 404 `CHECKOUT_NOT_FOUND`, 502 `PAYMENT_FAILED`, 503 `PAYMENTS_NOT_CONFIGURED`.
 
+## The website (GET /)
+
+`GET /` serves `frontend/index.html`, so the whole site runs at the base URL above, with no separate frontend hosting. A redeploy of the backend picks up the latest `frontend/index.html`. Only that one file is served; the rest of `frontend/` is not uploaded.
+
 ## Dev test page
 
 `GET /dev/record.html` is a bare page for recording from the mic (or picking a file), uploading it with the three-step flow, and transcribing or analysing it. It is for backend testing only, not part of the product.
