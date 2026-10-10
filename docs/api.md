@@ -149,6 +149,53 @@ The transcript is saved to Cloud Storage. Calling this again for the same record
 | 502 | `STORAGE_FAILED` | Cloud Storage error; safe to retry |
 | 504 | `TRANSCRIPTION_TIMEOUT` | Took longer than 240 s; safe to retry |
 
+## Billing (Stripe)
+
+Two plans, both with a **7-day free trial** (card taken at sign-up, charged when the trial ends):
+
+| `plan` | Price |
+| --- | --- |
+| `monthly` | €15 / month |
+| `yearly` | €150 / year |
+
+Runs in Stripe test mode with a `sk_test_` key in `STRIPE_SECRET_KEY`. Test card: `4242 4242 4242 4242`, any future date, any CVC. There are no user accounts: the frontend keeps the checkout `sessionId` in the browser and checks it with `GET /api/billing/session/:id`.
+
+If `STRIPE_SECRET_KEY` is not set, both endpoints return 503 `PAYMENTS_NOT_CONFIGURED`.
+
+### POST /api/billing/checkout
+
+**Request body** (JSON): `{ "plan": "monthly" }`
+
+**Response 201**
+
+```json
+{ "url": "https://checkout.stripe.com/c/pay/cs_test_..." }
+```
+
+Send the browser to `url` (`location.href = url`). After paying, Stripe sends the user back to `FRONTEND_URL` (or the calling page's origin) with `?checkout=success&session_id=cs_test_...`, or `?checkout=cancelled` if they backed out.
+
+**Errors**: 400 `UNKNOWN_PLAN`, 400 `NO_RETURN_URL` (page opened as a file, not over http), 502 `PAYMENT_FAILED`, 503 `PAYMENTS_NOT_CONFIGURED`.
+
+### GET /api/billing/session/:id
+
+Checks a checkout from the `session_id` Stripe returned. Call it on return from checkout and on later visits to confirm the subscription is still running.
+
+**Response 200**
+
+```json
+{
+  "active": true,
+  "plan": "monthly",
+  "status": "trialing",
+  "trialEndsAt": "2026-10-17T12:00:00.000Z",
+  "renewsAt": "2026-10-17T12:00:00.000Z"
+}
+```
+
+`active` is true while the subscription is `trialing` or `active`. `status` is Stripe's subscription status (`trialing`, `active`, `past_due`, `canceled`, ...).
+
+**Errors**: 404 `CHECKOUT_NOT_FOUND`, 502 `PAYMENT_FAILED`, 503 `PAYMENTS_NOT_CONFIGURED`.
+
 ## Dev test page
 
 `GET /dev/record.html` is a bare page for recording from the mic (or picking a file), uploading it with the three-step flow, and transcribing it. It is for backend testing only, not part of the product.

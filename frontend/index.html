@@ -29,19 +29,32 @@
 
   <!-- Header -->
   <header class="sticky top-0 z-10 border-b border-warm bg-paper/90 backdrop-blur">
-    <div class="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
+    <div class="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
       <a href="#" class="flex items-center gap-2 font-bold">
         <span class="grid h-8 w-8 place-items-center rounded-lg bg-primary text-white">
           <svg viewBox="0 0 24 24" class="h-4 w-4" fill="currentColor"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z"/></svg>
         </span>
         OutSpoken
       </a>
-      <nav class="flex gap-1 text-sm">
+      <nav class="hidden gap-1 text-sm sm:flex">
         <a v-for="link in navLinks" :key="link.href" :href="link.href"
            class="rounded-md px-3 py-1.5 text-stone-600 hover:bg-warm hover:text-stone-900">{{ link.label }}</a>
       </nav>
+      <div class="flex items-center gap-2 text-sm">
+        <span v-if="isPro" class="rounded-full bg-mint px-3 py-1 font-semibold text-emerald-900">Pro{{ sub.status === 'trialing' ? ' · trial' : '' }}</span>
+        <template v-else>
+          <span class="hidden text-stone-500 md:inline">{{ freeLeft ? '1 free analysis today' : 'Free analysis used today' }}</span>
+          <button @click="openPaywall(false)" class="rounded-lg bg-primary px-3 py-1.5 font-semibold text-white hover:bg-emerald-600">Go Pro</button>
+        </template>
+      </div>
     </div>
   </header>
+
+  <!-- Toast -->
+  <div v-if="toast" class="fixed inset-x-4 top-16 z-30 mx-auto max-w-md rounded-xl bg-stone-800 px-4 py-3 text-sm text-white shadow-lg" role="status">
+    {{ toast }}
+    <button @click="toast = ''" class="float-right ml-3 font-semibold text-mint">OK</button>
+  </div>
 
   <main class="mx-auto max-w-5xl px-4">
 
@@ -58,6 +71,7 @@
         <a href="#record" class="rounded-xl bg-primary px-6 py-3 font-semibold text-white shadow-sm hover:bg-emerald-600">Record a take</a>
         <button @click="showSample" class="rounded-xl border border-warm bg-white px-6 py-3 font-semibold hover:border-stone-300">See a sample report</button>
       </div>
+      <p class="mt-4 text-sm text-stone-500">One free full analysis every day. No sign-up.</p>
       <div class="mx-auto mt-14 grid max-w-3xl gap-4 text-left sm:grid-cols-3">
         <div v-for="f in features" :key="f.title" class="rounded-2xl border border-warm bg-white p-5">
           <div class="text-2xl">{{ f.icon }}</div>
@@ -79,8 +93,7 @@
         <div class="mt-6 flex flex-col items-center gap-4">
           <div class="font-mono text-3xl tabular-nums" :class="state === 'recording' ? 'text-primary' : 'text-stone-400'">{{ clock }}</div>
 
-          <!-- Idle / recorded: start; recording: stop -->
-          <button v-if="state !== 'recording'" @click="startRecording" :disabled="busy"
+          <button v-if="state !== 'recording'" @click="startRecording" :disabled="!!busy"
                   class="flex items-center gap-2 rounded-full bg-primary px-7 py-3 font-semibold text-white shadow-sm hover:bg-emerald-600 disabled:opacity-50">
             <span class="h-3 w-3 rounded-full bg-white"></span>
             {{ audioBlob ? 'Record again' : 'Start recording' }}
@@ -90,7 +103,7 @@
             <span class="h-3 w-3 rounded-sm bg-white"></span> Stop
           </button>
 
-          <label v-if="state !== 'recording'" class="cursor-pointer text-sm text-stone-600 underline decoration-warm underline-offset-4 hover:text-stone-900">
+          <label v-if="state !== 'recording' && !busy" class="cursor-pointer text-sm text-stone-600 underline decoration-warm underline-offset-4 hover:text-stone-900">
             or upload an audio file
             <input type="file" accept="audio/*" class="hidden" @change="pickFile">
           </label>
@@ -102,10 +115,18 @@
             <div class="mb-1 truncate text-sm text-stone-500">{{ audioName }}</div>
             <audio :src="audioUrl" controls class="w-full sm:w-72"></audio>
           </div>
-          <button @click="analyse" :disabled="busy"
-                  class="w-full rounded-xl bg-primary px-6 py-3 font-semibold text-white hover:bg-emerald-600 disabled:opacity-60 sm:w-auto">
-            {{ busy ? 'Uploading…' : 'Get feedback' }}
-          </button>
+          <div class="flex w-full flex-col items-center gap-1 sm:w-auto sm:items-end">
+            <button @click="getFeedback" :disabled="!!busy"
+                    class="w-full rounded-xl bg-primary px-6 py-3 font-semibold text-white hover:bg-emerald-600 disabled:opacity-60 sm:w-auto">
+              {{ busy || 'Get feedback' }}
+            </button>
+            <span class="text-xs text-stone-500">
+              <template v-if="busy === 'Transcribing…'">Usually 5–40 seconds</template>
+              <template v-else-if="isPro">Unlimited with Pro</template>
+              <template v-else-if="freeLeft">Uses today's free analysis</template>
+              <template v-else>Free analysis used today</template>
+            </span>
+          </div>
         </div>
 
         <!-- Error -->
@@ -126,11 +147,11 @@
 
       <div v-else class="mt-6 space-y-6">
         <p v-if="report.isSample" class="rounded-xl bg-mint/50 px-4 py-2 text-sm text-emerald-900">
-          This is sample feedback. Real analysis will be shown here once the backend supports it.
+          This is a sample report. Record a take to get one for your own voice.
         </p>
 
         <!-- Stats -->
-        <div class="grid gap-4 sm:grid-cols-4">
+        <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div v-for="s in report.stats" :key="s.label" class="rounded-2xl border border-warm bg-white p-5">
             <div class="text-sm text-stone-500">{{ s.label }}</div>
             <div class="mt-1 text-3xl font-bold" :class="s.color">{{ s.value }}</div>
@@ -138,21 +159,45 @@
           </div>
         </div>
 
+        <!-- Transcript breakdown -->
+        <div class="rounded-2xl border border-warm bg-white p-5">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h3 class="font-semibold">Transcript breakdown</h3>
+            <div class="flex flex-wrap gap-3 text-xs text-stone-600">
+              <span><span class="rounded bg-amber-100 px-1.5 text-amber-900">um</span> filler</span>
+              <span><span class="underline decoration-accent decoration-2 underline-offset-4">really</span> repeated</span>
+              <span><span class="rounded bg-accent/10 px-1.5 text-cyan-800">⏸ 2.1s</span> long pause</span>
+            </div>
+          </div>
+          <audio v-if="report.audioUrl" ref="player" :src="report.audioUrl" controls class="mt-4 w-full"></audio>
+          <p class="mt-1 text-xs text-stone-500" v-if="report.audioUrl">Tap any word to hear that moment.</p>
+          <p class="mt-4 max-h-80 overflow-y-auto rounded-xl bg-paper p-4 leading-8">
+            <template v-for="(w, i) in report.words" :key="i">
+              <span v-if="w.pause" class="mx-1 rounded bg-accent/10 px-1.5 py-0.5 text-xs text-cyan-800">⏸ {{ w.pause.toFixed(1) }}s</span>
+              <span @click="seek(w.start)" :title="fmtTime(w.start)"
+                    class="rounded px-0.5"
+                    :class="[w.filler ? 'bg-amber-100 text-amber-900' : '', w.repeated ? 'underline decoration-accent decoration-2 underline-offset-4' : '', report.audioUrl ? 'cursor-pointer hover:bg-mint/60' : '']">{{ w.text }}</span>{{ ' ' }}
+            </template>
+          </p>
+        </div>
+
         <!-- Fillers + repeated words -->
         <div class="grid gap-4 md:grid-cols-2">
           <div class="rounded-2xl border border-warm bg-white p-5">
-            <h3 class="font-semibold">Filler words</h3>
+            <h3 class="font-semibold">Filler words and habits</h3>
+            <p v-if="!report.fillers.length" class="mt-4 rounded-lg bg-mint/40 px-3 py-2 text-sm text-emerald-900">No filler words found. Nice.</p>
             <ul class="mt-4 space-y-3">
               <li v-for="f in report.fillers" :key="f.word">
                 <div class="flex justify-between text-sm"><span>"{{ f.word }}"</span><span class="font-semibold">{{ f.count }}×</span></div>
                 <div class="mt-1 h-2 rounded-full bg-mint/60">
-                  <div class="h-2 rounded-full bg-primary" :style="{ width: (f.count / maxFiller * 100) + '%' }"></div>
+                  <div class="h-2 rounded-full bg-primary" :style="{ width: (f.count / report.fillers[0].count * 100) + '%' }"></div>
                 </div>
               </li>
             </ul>
           </div>
           <div class="rounded-2xl border border-warm bg-white p-5">
             <h3 class="font-semibold">Repeated words</h3>
+            <p v-if="!report.repeated.length" class="mt-4 rounded-lg bg-mint/40 px-3 py-2 text-sm text-emerald-900">Good variety. No word stood out as overused.</p>
             <ul class="mt-4 divide-y divide-warm">
               <li v-for="r in report.repeated" :key="r.word" class="py-2.5 text-sm">
                 <span class="font-semibold">"{{ r.word }}"</span> <span class="text-stone-500">used {{ r.count }}×</span>
@@ -168,10 +213,11 @@
         <!-- Moments -->
         <div class="rounded-2xl border border-warm bg-white p-5">
           <h3 class="font-semibold">Moments to fix</h3>
+          <p v-if="!report.moments.length" class="mt-4 rounded-lg bg-mint/40 px-3 py-2 text-sm text-emerald-900">Nothing major to fix in this take. Keep it up.</p>
           <ul class="mt-4 space-y-4">
-            <li v-for="m in report.moments" :key="m.time" class="rounded-xl border border-warm p-4">
+            <li v-for="m in report.moments" :key="m.start + m.type" class="rounded-xl border border-warm p-4">
               <div class="flex flex-wrap items-center gap-2 text-xs">
-                <span class="rounded-md bg-stone-100 px-2 py-0.5 font-mono">{{ m.time }}</span>
+                <button @click="seek(m.start)" class="rounded-md bg-stone-100 px-2 py-0.5 font-mono hover:bg-mint">{{ fmtTime(m.start) }}</button>
                 <span class="rounded-md px-2 py-0.5 font-semibold" :class="tagClass[m.type]">{{ m.type }}</span>
               </div>
               <blockquote class="mt-3 border-l-4 border-warm pl-3 italic text-stone-600">"{{ m.quote }}"</blockquote>
@@ -186,16 +232,19 @@
     <!-- Progress -->
     <section id="progress" class="scroll-mt-20 py-10">
       <h2 class="text-2xl font-bold">3. Your progress</h2>
-      <p class="mt-1 text-stone-600">Your last {{ history.length }} recordings. <span v-if="!uploadedAny" class="text-stone-500">(sample data)</span></p>
+      <p class="mt-1 text-stone-600">
+        <template v-if="history.length">Your last {{ history.length }} recording{{ history.length > 1 ? 's' : '' }}.</template>
+        <template v-else>Sample data. Your own takes will show here.</template>
+      </p>
 
       <div class="mt-6 grid gap-4 md:grid-cols-2">
         <div class="rounded-2xl border border-warm bg-white p-5">
           <h3 class="font-semibold">Filler words per minute</h3>
           <p class="text-xs text-stone-500">Lower is better</p>
           <div class="mt-4 flex h-40 items-end gap-3">
-            <div v-for="h in history" :key="h.label" class="flex flex-1 flex-col items-center gap-1">
+            <div v-for="h in chartData" :key="h.label" class="flex h-full flex-1 flex-col items-center justify-end gap-1">
               <span class="text-xs font-semibold">{{ h.fillersPerMin }}</span>
-              <div class="w-full rounded-t-md bg-primary" :style="{ height: (h.fillersPerMin / maxFpm * 100) + '%' }"></div>
+              <div class="w-full rounded-t-md bg-primary" :style="{ height: Math.max(2, h.fillersPerMin / maxFpm * 80) + '%' }"></div>
               <span class="text-xs text-stone-500">{{ h.label }}</span>
             </div>
           </div>
@@ -203,11 +252,10 @@
         <div class="rounded-2xl border border-warm bg-white p-5">
           <h3 class="font-semibold">Speaking pace (words/min)</h3>
           <p class="text-xs text-stone-500">Aim for 140–160</p>
-          <div class="relative mt-4 flex h-40 items-end gap-3">
-            <div class="absolute inset-x-0 rounded bg-mint/40" :style="{ bottom: (140 / maxPace * 100) + '%', height: (20 / maxPace * 100) + '%' }"></div>
-            <div v-for="h in history" :key="h.label" class="relative flex flex-1 flex-col items-center gap-1">
+          <div class="mt-4 flex h-40 items-end gap-3">
+            <div v-for="h in chartData" :key="h.label" class="flex h-full flex-1 flex-col items-center justify-end gap-1">
               <span class="text-xs font-semibold">{{ h.pace }}</span>
-              <div class="w-full rounded-t-md bg-accent" :style="{ height: (h.pace / maxPace * 100) + '%' }"></div>
+              <div class="w-full rounded-t-md bg-accent" :style="{ height: Math.max(2, h.pace / maxPace * 80) + '%' }"></div>
               <span class="text-xs text-stone-500">{{ h.label }}</span>
             </div>
           </div>
@@ -218,54 +266,220 @@
   </main>
 
   <footer class="mt-10 border-t border-warm py-8 text-center text-sm text-stone-500">
-    OutSpoken · HackUCD sample
+    OutSpoken · HackUCD
   </footer>
+
+  <!-- Paywall -->
+  <div v-if="paywall.open" class="fixed inset-0 z-40 flex items-end justify-center bg-stone-900/40 p-4 sm:items-center" @click.self="paywall.open = false">
+    <div class="max-h-full w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl" role="dialog" aria-modal="true" aria-labelledby="paywall-title">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h2 id="paywall-title" class="text-xl font-bold">{{ paywall.limitHit ? "You've used today's free analysis" : 'Go Pro with OutSpoken' }}</h2>
+          <p class="mt-1 text-sm text-stone-600">
+            {{ paywall.limitHit ? 'Come back tomorrow for another free one, or start a free trial for unlimited feedback now.' : 'Unlimited full analyses on every take.' }}
+          </p>
+        </div>
+        <button @click="paywall.open = false" class="rounded-md p-1 text-stone-400 hover:bg-warm hover:text-stone-700" aria-label="Close">✕</button>
+      </div>
+
+      <div class="mt-5 grid gap-3 sm:grid-cols-2">
+        <button v-for="p in plans" :key="p.id" @click="paywall.plan = p.id"
+                class="relative rounded-xl border-2 p-4 text-left transition"
+                :class="paywall.plan === p.id ? 'border-primary bg-mint/20' : 'border-warm hover:border-stone-300'">
+          <span v-if="p.badge" class="absolute -top-2.5 right-3 rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-white">{{ p.badge }}</span>
+          <div class="font-semibold">{{ p.name }}</div>
+          <div class="mt-1"><span class="text-2xl font-bold">{{ p.price }}</span><span class="text-sm text-stone-500">{{ p.per }}</span></div>
+          <div class="mt-1 text-xs text-stone-500">{{ p.note }}</div>
+        </button>
+      </div>
+
+      <ul class="mt-5 space-y-1.5 text-sm">
+        <li v-for="perk in perks" :key="perk" class="flex gap-2"><span class="text-primary">✓</span>{{ perk }}</li>
+      </ul>
+
+      <button @click="subscribe" :disabled="paywall.loading"
+              class="mt-6 w-full rounded-xl bg-primary px-6 py-3 font-semibold text-white hover:bg-emerald-600 disabled:opacity-60">
+        {{ paywall.loading ? 'Opening checkout…' : 'Start 7-day free trial' }}
+      </button>
+      <p class="mt-2 text-center text-xs text-stone-500">Then {{ selectedPlan.price }}{{ selectedPlan.per }}. Cancel any time before the trial ends and you won't be charged. Payments by Stripe.</p>
+      <p v-if="paywall.error" class="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">{{ paywall.error }}</p>
+    </div>
+  </div>
 </div>
 
 <script>
-  // Backend from this repo (server.js). Change for Cloud Run.
-  const API_URL = 'http://localhost:8080';
+  // Backend from this repo (server.js), deployed on Cloud Run. For a local backend use 'http://localhost:8080'.
+  const API_URL = 'https://hackucd-backend-177345674775.europe-west1.run.app';
 
-  // Placeholder until the backend has an analysis endpoint
-  const SAMPLE_REPORT = {
-    stats: [
-      { label: 'Filler words', value: '14', note: '4.7 per minute', color: 'text-stone-800' },
-      { label: 'Pace', value: '172', note: 'words/min · a bit fast', color: 'text-cyan-700' },
-      { label: 'Clarity', value: '7/10', note: 'Strong middle, weak opening', color: 'text-primary' },
-      { label: 'Length', value: '3:00', note: '512 words', color: 'text-stone-800' },
-    ],
-    fillers: [
-      { word: 'um', count: 6 },
-      { word: 'like', count: 4 },
-      { word: 'you know', count: 3 },
-      { word: 'basically', count: 1 },
-    ],
-    repeated: [
-      { word: 'really', count: 9, alternatives: ['genuinely', 'seriously', '(cut it)'] },
-      { word: 'super', count: 5, alternatives: ['very', 'incredibly', 'remarkably'] },
-      { word: 'so', count: 7, alternatives: ['start with the point'] },
-    ],
-    moments: [
-      {
-        time: '0:02', type: 'Weak opening',
-        quote: 'Hey guys, um, so today I wanted to, like, kind of talk about something…',
-        issue: 'The first 8 seconds say nothing about the topic. Viewers decide whether to stay in the first few seconds.',
-        fix: 'Open with the hook: "Three morning habits doubled my focus. Here\'s the one that surprised me."',
-      },
-      {
-        time: '0:47', type: 'Filler words',
-        quote: 'It\'s, um, it\'s really, like, really important to, you know, stay consistent.',
-        issue: 'Three fillers and a repeated "really" in one sentence bury the point.',
-        fix: 'Pause instead of filling: "Consistency matters more than intensity."',
-      },
-      {
-        time: '1:32', type: 'Rambling',
-        quote: 'And that\'s kind of why, I mean, it depends, but for me anyway it sort of worked out…',
-        issue: 'The point trails off without landing.',
-        fix: 'Finish with one clear sentence, then stop: "For me, that one change worked."',
-      },
-    ],
+  // ---------- Browser storage (per-browser free use, plan and history) ----------
+  const store = {
+    get(key, fallback = null) {
+      try { const v = localStorage.getItem(`outspoken.${key}`); return v === null ? fallback : JSON.parse(v); } catch { return fallback; }
+    },
+    set(key, value) {
+      try { localStorage.setItem(`outspoken.${key}`, JSON.stringify(value)); } catch { /* private mode: lives only for this visit */ }
+    },
   };
+  const today = () => new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD, local time
+
+  async function api(path, options = {}) {
+    let res;
+    try {
+      res = await fetch(`${API_URL}${path}`, options);
+    } catch {
+      throw new Error(`Could not reach the server at ${API_URL}. Is the backend running?`);
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error?.message || `Request failed (${res.status}).`);
+    return data;
+  }
+
+  // ---------- Transcript analysis (runs in the browser on the backend's word timings) ----------
+  const FILLERS = new Set(['um', 'umm', 'uh', 'uhh', 'uhm', 'erm', 'er', 'ah', 'hmm', 'basically', 'literally', 'actually']);
+  const FILLER_PAIRS = new Set(['you know', 'i mean', 'kind of', 'sort of']);
+  const WEAK_OPENERS = new Set(['so', 'hey', 'um', 'uh', 'okay', 'ok', 'alright', 'well']);
+  const STOPWORDS = new Set(('that this with have from they them then than there their what when where which would could should about your '
+    + "you're were been being into also because these those it's that's i'm don't didn't going want there's here").split(' '));
+  const ALTERNATIVES = {
+    really: ['genuinely', 'truly', '(cut it)'], very: ['extremely', 'remarkably', '(cut it)'], super: ['incredibly', 'seriously'],
+    just: ['(cut it)', 'simply', 'only'], thing: ['idea', 'step', 'point'], things: ['ideas', 'steps', 'details'],
+    stuff: ['material', 'gear', 'details'], good: ['solid', 'useful', 'strong'], great: ['excellent', 'impressive'],
+    amazing: ['striking', 'brilliant'], awesome: ['excellent', 'fantastic'], think: ['believe', 'reckon', '(state it directly)'],
+    know: ['realise', 'understand'], like: ['such as', 'similar to'], pretty: ['fairly', 'quite'], important: ['key', 'essential', 'crucial'],
+  };
+  const PAUSE_SECONDS = 1.5; // shown in the transcript
+  const LONG_PAUSE_SECONDS = 2.5; // flagged as a moment to fix
+
+  const norm = (word) => word.toLowerCase().replace(/[^a-z']/g, '');
+  const join = (words) => words.map((w) => w.text).join(' ');
+
+  // "It's, um, it's really, like, important" -> "It's really important"
+  function withoutFillers(sentence) {
+    const kept = [];
+    sentence.forEach((w, i) => {
+      if (w.filler) return;
+      let text = w.text;
+      if (sentence[i + 1]?.filler) text = text.replace(/,$/, ''); // comma only set off the filler
+      if (kept.length && norm(kept[kept.length - 1]) === w.norm) kept.pop(); // stutter: "it's, it's"
+      kept.push(text);
+    });
+    const clean = kept.join(' ');
+    return clean.charAt(0).toUpperCase() + clean.slice(1);
+  }
+
+  function analyseTranscript(transcript) {
+    const words = transcript.words.map((w) => ({ text: w.word, start: w.start, end: w.end, norm: norm(w.word), filler: '', pause: 0 }));
+    words.forEach((w, i) => {
+      const prev = words[i - 1], next = words[i + 1];
+      if (FILLERS.has(w.norm)) w.filler = w.norm;
+      // "like" only counts as filler when set off by commas ("it's, like, great"), not "I like it"
+      if (w.norm === 'like' && (/,$/.test(w.text) || /,$/.test(prev?.text || ''))) w.filler = 'like';
+      const pair = next && `${w.norm} ${next.norm}`;
+      if (!w.filler && FILLER_PAIRS.has(pair)) { w.filler = pair; next.filler = pair; next.pairTail = true; }
+      if (prev && w.start - prev.end >= PAUSE_SECONDS) w.pause = w.start - prev.end;
+    });
+
+    const duration = transcript.duration || words[words.length - 1]?.end || 1;
+    const minutes = Math.max(duration / 60, 1 / 60);
+
+    const fillerCounts = {};
+    words.filter((w) => w.filler && !w.pairTail).forEach((w) => { fillerCounts[w.filler] = (fillerCounts[w.filler] || 0) + 1; });
+    const fillers = Object.entries(fillerCounts).map(([word, count]) => ({ word, count })).sort((a, b) => b.count - a.count);
+    const fillerTotal = fillers.reduce((n, f) => n + f.count, 0);
+
+    const wordCounts = {};
+    words.filter((w) => !w.filler && w.norm.length >= 4 && !STOPWORDS.has(w.norm))
+      .forEach((w) => { wordCounts[w.norm] = (wordCounts[w.norm] || 0) + 1; });
+    const repeated = Object.entries(wordCounts).filter(([, c]) => c >= 3).sort((a, b) => b[1] - a[1]).slice(0, 5)
+      .map(([word, count]) => ({ word, count, alternatives: ALTERNATIVES[word] || ['vary it', '(or cut it)'] }));
+    const repeatedSet = new Set(repeated.map((r) => r.word));
+    words.forEach((w) => { w.repeated = !w.filler && repeatedSet.has(w.norm); });
+
+    // Split into sentences on . ! ?
+    const sentences = [];
+    let current = [];
+    words.forEach((w, i) => {
+      current.push(w);
+      if (/[.!?]["']?$/.test(w.text) || i === words.length - 1) { sentences.push(current); current = []; }
+    });
+
+    const moments = [];
+    const opening = words.slice(0, 8);
+    if (opening.some((w) => w.filler) || WEAK_OPENERS.has(words[0]?.norm)) {
+      moments.push({
+        start: words[0].start, type: 'Weak opening',
+        quote: join(words.slice(0, 15)) + (words.length > 15 ? '…' : ''),
+        issue: 'Your first words are warm-up, not your point. Viewers decide in the first few seconds whether to keep watching.',
+        fix: 'Start with the hook: say your main point or a bold claim in the very first sentence.',
+      });
+    }
+    sentences
+      .map((s) => ({ s, n: s.filter((w) => w.filler && !w.pairTail).length }))
+      .filter(({ s, n }) => n >= 2 && !(moments.length && s === sentences[0])) // opening already flagged
+      .sort((a, b) => b.n - a.n).slice(0, 3)
+      .forEach(({ s, n }) => {
+        moments.push({
+          start: s[0].start, type: 'Filler words', quote: join(s),
+          issue: `${n} filler words in one sentence bury the point.`,
+          fix: `Pause instead of filling: "${withoutFillers(s)}"`,
+        });
+      });
+    const long = sentences.find((s) => s.length >= 40);
+    if (long) {
+      moments.push({
+        start: long[0].start, type: 'Rambling', quote: join(long.slice(0, 14)) + '…',
+        issue: `This sentence runs ${long.length} words without a break, so the point gets lost.`,
+        fix: 'Split it into two or three short sentences, each making one point.',
+      });
+    }
+    words.map((w, i) => ({ w, i })).filter(({ w }) => w.pause >= LONG_PAUSE_SECONDS)
+      .sort((a, b) => b.w.pause - a.w.pause).slice(0, 2)
+      .forEach(({ w, i }) => {
+        moments.push({
+          start: words[i - 1].end, type: 'Long pause',
+          quote: `${join(words.slice(Math.max(0, i - 6), i))} … ${join(words.slice(i, i + 6))}`,
+          issue: `You paused for ${w.pause.toFixed(1)} seconds here.`,
+          fix: 'Cut the gap in editing, or know your next point before you start so you can keep going.',
+        });
+      });
+    moments.sort((a, b) => a.start - b.start);
+
+    const pace = Math.round(words.length / minutes);
+    const fillersPerMin = +(fillerTotal / minutes).toFixed(1);
+    const pauses = words.filter((w) => w.pause).length;
+    return {
+      words, fillers, repeated, moments, pace, fillersPerMin,
+      stats: [
+        { label: 'Filler words', value: String(fillerTotal), note: `${fillersPerMin} per minute`, color: fillersPerMin > 4 ? 'text-amber-700' : 'text-primary' },
+        { label: 'Pace', value: String(pace), note: `words/min · ${pace > 170 ? 'a bit fast' : pace < 120 ? 'a bit slow' : 'good pace'}`, color: 'text-cyan-700' },
+        { label: 'Long pauses', value: String(pauses), note: `over ${PAUSE_SECONDS}s`, color: 'text-stone-800' },
+        { label: 'Length', value: fmtTime(duration), note: `${words.length} words`, color: 'text-stone-800' },
+      ],
+    };
+  }
+
+  function fmtTime(seconds) {
+    const s = Math.max(0, Math.round(seconds));
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  }
+
+  // Sample transcript in the backend's shape, with made-up timings. "||" marks a long pause.
+  const SAMPLE_TEXT = "Hey guys, um, so today I wanted to, like, kind of talk about my morning routine. So basically I wake up really early, "
+    + "like, really early, and the first thing I do is, um, drink a glass of water. It's, um, it's really important to, you know, stay consistent. || "
+    + "And then I go for a walk, which is honestly really good for clearing my head, and I mean it depends on the weather but for me anyway it "
+    + "sort of worked out and I just kept doing it every single day even when I didn't really feel like it and that's why I think it works. "
+    + "The really big thing is consistency. Um, so yeah, that's basically my routine. || Let me know what your morning looks like in the comments.";
+  function sampleTranscript() {
+    let t = 0;
+    const words = [];
+    SAMPLE_TEXT.split(' ').forEach((token) => {
+      if (token === '||') { t += 2.8; return; }
+      const length = 0.18 + token.length * 0.035;
+      words.push({ word: token, start: +t.toFixed(2), end: +(t + length).toFixed(2) });
+      t += length + 0.08;
+    });
+    return { words, duration: +t.toFixed(2) };
+  }
 
   const SAMPLE_HISTORY = [
     { label: 'Take 1', fillersPerMin: 8.2, pace: 185 },
@@ -289,35 +503,44 @@
           { icon: '🔍', title: 'Specific feedback', text: 'Every note quotes what you said and shows a better way.' },
           { icon: '📈', title: 'Track progress', text: 'See your filler words drop take after take.' },
         ],
+        plans: [
+          { id: 'monthly', name: 'Monthly', price: '€15', per: '/month', note: 'Billed monthly after your trial' },
+          { id: 'yearly', name: 'Yearly', price: '€150', per: '/year', note: '€12.50/month · save €30', badge: 'Best value' },
+        ],
+        perks: ['Unlimited full analyses, every day', 'Transcript breakdown and moments to fix', 'Progress tracking across every take', '7 days free, cancel any time'],
         tagClass: {
           'Weak opening': 'bg-amber-100 text-amber-800',
           'Filler words': 'bg-accent/15 text-cyan-800',
           'Rambling': 'bg-stone-200 text-stone-700',
+          'Long pause': 'bg-mint text-emerald-900',
         },
         state: 'idle', // idle | recording | ready
-        busy: false,
+        busy: '', // '' or the step being shown on the button
         error: '',
+        toast: '',
         seconds: 0,
         audioBlob: null,
         audioUrl: '',
         audioName: '',
         report: null,
-        history: SAMPLE_HISTORY.map((h) => ({ ...h })),
-        uploadedAny: false,
+        history: store.get('history', []),
+        freeDay: store.get('freeDay'),
+        sub: store.get('sub'),
+        paywall: { open: false, limitHit: false, plan: 'yearly', loading: false, error: '' },
       };
     },
     computed: {
-      clock() {
-        const m = Math.floor(this.seconds / 60);
-        const s = String(this.seconds % 60).padStart(2, '0');
-        return `${m}:${s}`;
-      },
-      maxFiller() { return Math.max(...(this.report?.fillers.map((f) => f.count) || [1])); },
-      maxFpm() { return Math.max(...this.history.map((h) => h.fillersPerMin)); },
-      maxPace() { return Math.max(200, ...this.history.map((h) => h.pace)); },
+      clock() { return fmtTime(this.seconds); },
+      isPro() { return !!this.sub?.active; },
+      freeLeft() { return this.freeDay !== today(); },
+      selectedPlan() { return this.plans.find((p) => p.id === this.paywall.plan); },
+      chartData() { return this.history.length ? this.history : SAMPLE_HISTORY; },
+      maxFpm() { return Math.max(1, ...this.chartData.map((h) => h.fillersPerMin)); },
+      maxPace() { return Math.max(200, ...this.chartData.map((h) => h.pace)); },
       trend() {
-        const first = this.history[0], last = this.history[this.history.length - 1];
-        if (!first || first === last) return '';
+        const data = this.chartData;
+        const first = data[0], last = data[data.length - 1];
+        if (data.length < 2 || !first.fillersPerMin) return '';
         const drop = Math.round((1 - last.fillersPerMin / first.fillersPerMin) * 100);
         return drop > 0 ? `Nice work: ${drop}% fewer filler words than your first take.` : '';
       },
@@ -325,8 +548,11 @@
     mounted() {
       this.drawIdleWave();
       window.addEventListener('resize', () => this.state !== 'recording' && this.drawIdleWave());
+      window.addEventListener('keydown', (e) => { if (e.key === 'Escape') this.paywall.open = false; });
+      this.handleCheckoutReturn();
     },
     methods: {
+      // ---------- Recording ----------
       async startRecording() {
         this.error = '';
         let stream;
@@ -370,65 +596,123 @@
         this.state = 'ready';
       },
       setAudio(blob, name) {
-        if (this.audioUrl) URL.revokeObjectURL(this.audioUrl);
+        if (this.audioUrl && this.audioUrl !== this.report?.audioUrl) URL.revokeObjectURL(this.audioUrl);
         this.audioBlob = blob;
         this.audioName = name;
         this.audioUrl = URL.createObjectURL(blob);
       },
-      async analyse() {
-        this.busy = true;
+
+      // ---------- Upload, transcribe, analyse ----------
+      async getFeedback() {
+        if (!this.isPro && !this.freeLeft) return this.openPaywall(true);
         this.error = '';
         try {
-          const form = new FormData();
-          form.append('audio', this.audioBlob, this.audioName);
-          const res = await fetch(`${API_URL}/api/recordings`, { method: 'POST', body: form });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(data.error?.message || `Upload failed (${res.status}).`);
-          // Uploaded. Analysis isn't built yet, so show sample feedback.
-          this.addToHistory();
-          this.showSample();
+          this.busy = 'Uploading…';
+          const recording = await this.uploadRecording(this.audioBlob, this.audioName);
+          this.busy = 'Transcribing…';
+          const transcript = await api(`/api/recordings/${recording.id}/transcript`, { method: 'POST' });
+          const analysis = analyseTranscript(transcript);
+          this.report = { ...analysis, audioUrl: this.audioUrl, isSample: false };
+          if (!this.isPro) { this.freeDay = today(); store.set('freeDay', this.freeDay); }
+          this.history = [...this.history, { label: `Take ${this.history.length + 1}`, fillersPerMin: analysis.fillersPerMin, pace: analysis.pace }].slice(-6);
+          store.set('history', this.history);
+          this.scrollTo('feedback');
         } catch (err) {
-          this.error = err instanceof TypeError
-            ? `Could not reach the server at ${API_URL}. Is the backend running?`
-            : err.message;
+          this.error = err.message;
         } finally {
-          this.busy = false;
+          this.busy = '';
         }
       },
-      addToHistory() {
-        if (!this.uploadedAny) this.history = [];
-        this.uploadedAny = true;
-        const prev = this.history[this.history.length - 1];
-        this.history.push({
-          label: `Take ${this.history.length + 1}`,
-          fillersPerMin: prev ? Math.max(1, +(prev.fillersPerMin * 0.85).toFixed(1)) : 6.5,
-          pace: prev ? Math.max(145, prev.pace - 5) : 175,
+      // Three-step upload straight to Cloud Storage (see docs/api.md)
+      async uploadRecording(file, fileName) {
+        const link = await api('/api/recordings/upload-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contentType: file.type, fileName, sizeBytes: file.size }),
         });
-        if (this.history.length > 6) this.history.shift();
+        let put;
+        try {
+          put = await fetch(link.uploadUrl, { method: link.method, headers: link.headers, body: file });
+        } catch {
+          put = { ok: false };
+        }
+        if (!put.ok) throw new Error('Upload failed. Please try again.');
+        return api(`/api/recordings/${link.id}/complete`, { method: 'POST' });
       },
       showSample() {
-        this.report = { ...SAMPLE_REPORT, isSample: true };
-        this.$nextTick(() => document.getElementById('feedback').scrollIntoView({ behavior: 'smooth' }));
+        this.report = { ...analyseTranscript(sampleTranscript()), audioUrl: '', isSample: true };
+        this.scrollTo('feedback');
+      },
+      seek(seconds) {
+        const player = this.$refs.player;
+        if (!player) return;
+        player.currentTime = seconds;
+        player.play();
+      },
+      scrollTo(id) {
+        this.$nextTick(() => document.getElementById(id).scrollIntoView({ behavior: 'smooth' }));
+      },
+      fmtTime,
+
+      // ---------- Subscription (Stripe Checkout) ----------
+      openPaywall(limitHit) {
+        Object.assign(this.paywall, { open: true, limitHit, error: '', loading: false });
+      },
+      async subscribe() {
+        this.paywall.loading = true;
+        this.paywall.error = '';
+        try {
+          const { url } = await api('/api/billing/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plan: this.paywall.plan }),
+          });
+          location.href = url;
+        } catch (err) {
+          this.paywall.error = err.message;
+          this.paywall.loading = false;
+        }
+      },
+      async handleCheckoutReturn() {
+        const params = new URLSearchParams(location.search);
+        const result = params.get('checkout');
+        if (result) history.replaceState(null, '', location.pathname + location.hash);
+
+        if (result === 'cancelled') this.toast = 'Checkout cancelled. You have not been charged.';
+        const sessionId = result === 'success' ? params.get('session_id') : this.sub?.sessionId;
+        if (!sessionId) return;
+        try {
+          const status = await api(`/api/billing/session/${encodeURIComponent(sessionId)}`);
+          this.sub = { sessionId, ...status };
+          store.set('sub', this.sub);
+          if (result === 'success') {
+            this.toast = status.active
+              ? `You're on OutSpoken Pro. Your free trial runs until ${new Date(status.trialEndsAt || status.renewsAt).toLocaleDateString()}.`
+              : 'We could not confirm your subscription yet. Refresh in a moment.';
+          }
+        } catch (err) {
+          // Keep the saved plan if the server is unreachable; show errors only right after checkout
+          if (result === 'success') this.toast = err.message;
+        }
       },
 
-      // Waveform drawing (cyan accent)
+      // ---------- Waveform drawing (cyan accent) ----------
       sizeCanvas() {
         const c = this.$refs.wave;
         const dpr = window.devicePixelRatio || 1;
         c.width = c.clientWidth * dpr;
         c.height = c.clientHeight * dpr;
-        return c;
       },
       drawBars(levels) {
         const c = this.$refs.wave;
         const ctx = c.getContext('2d');
         ctx.clearRect(0, 0, c.width, c.height);
         ctx.fillStyle = '#06B6D4';
+        ctx.globalAlpha = this.state === 'recording' ? 1 : 0.35;
         const gap = 3 * (window.devicePixelRatio || 1);
         const w = (c.width - gap * (levels.length - 1)) / levels.length;
         levels.forEach((v, i) => {
           const h = Math.max(4, v * c.height * 0.9);
-          ctx.globalAlpha = this.state === 'recording' ? 1 : 0.35;
           ctx.fillRect(i * (w + gap), (c.height - h) / 2, w, h);
         });
       },

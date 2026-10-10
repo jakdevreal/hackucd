@@ -16,6 +16,14 @@ const UPLOAD_URL_MINUTES = 15;
 const TRANSCRIBE_TIMEOUT_SECONDS = Number(process.env.TRANSCRIBE_TIMEOUT_SECONDS) || 240;
 const RECORDING_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
+// Subscription plans sold through Stripe Checkout. Prices in cents.
+const TRIAL_DAYS = 7;
+const PLANS = {
+  monthly: { name: 'OutSpoken Monthly', amount: 1500, interval: 'month' },
+  yearly: { name: 'OutSpoken Yearly', amount: 15000, interval: 'year' },
+};
+const CHECKOUT_SESSION_ID = /^cs_(test|live)_[A-Za-z0-9]+$/;
+
 // Audio formats we accept, keyed by what the file's first bytes say it is.
 // We trust the bytes, not the browser's reported type: phones often send a blank
 // or generic type, and a renamed file can claim to be audio when it isn't.
@@ -85,6 +93,33 @@ function transcriptionApiError(err) {
     return apiError(422, 'UNREADABLE_AUDIO', 'Could not read the audio in this recording. Try recording again.');
   }
   return apiError(502, 'TRANSCRIPTION_FAILED', 'The transcription service failed. Please try again.');
+}
+
+// Calls the Stripe REST API directly (no SDK). params are flat form fields like 'line_items[0][quantity]'.
+async function stripeRequest(method, endpoint, params = {}) {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) throw apiError(503, 'PAYMENTS_NOT_CONFIGURED', 'Payments are not set up yet.');
+  const query = new URLSearchParams(params);
+  const url = `https://api.stripe.com/v1/${endpoint}${method === 'GET' ? `?${query}` : ''}`;
+  let res;
+  try {
+    res = await fetch(url, {
+      method,
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: method === 'GET' ? undefined : query,
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch (err) {
+    console.error('Stripe request failed:', err.message);
+    throw apiError(502, 'PAYMENT_FAILED', 'Could not reach the payment provider. Please try again.');
+  }
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 404) throw apiError(404, 'CHECKOUT_NOT_FOUND', 'No checkout with that id.');
+  if (!res.ok) {
+    console.error('Stripe error:', data.error?.message || res.status);
+    throw apiError(502, 'PAYMENT_FAILED', 'The payment provider returned an error. Please try again.');
+  }
+  return data;
 }
 
 app.use(express.json());
@@ -253,6 +288,57 @@ app.post('/api/recordings/:id/transcript', async (req, res, next) => {
     next(err);
   } finally {
     await rm(workDir, { recursive: true, force: true });
+  }
+});
+
+// Starts a Stripe Checkout for a plan; the frontend sends the browser to the returned url
+app.post('/api/billing/checkout', async (req, res, next) => {
+  const planId = req.body?.plan;
+  const plan = PLANS[planId];
+  if (!plan) return next(apiError(400, 'UNKNOWN_PLAN', 'Choose the monthly or yearly plan.'));
+
+  // Where Stripe sends the user back to: the deployed frontend, or the page that called us
+  const origin = req.get('origin');
+  const returnTo = process.env.FRONTEND_URL || (/^https?:\/\//.test(origin || '') ? origin : null);
+  if (!returnTo) return next(apiError(400, 'NO_RETURN_URL', 'Open the site over http(s) to subscribe.'));
+
+  try {
+    const session = await stripeRequest('POST', 'checkout/sessions', {
+      mode: 'subscription',
+      'line_items[0][quantity]': 1,
+      'line_items[0][price_data][currency]': 'eur',
+      'line_items[0][price_data][unit_amount]': plan.amount,
+      'line_items[0][price_data][recurring][interval]': plan.interval,
+      'line_items[0][price_data][product_data][name]': plan.name,
+      'subscription_data[trial_period_days]': TRIAL_DAYS,
+      'metadata[plan]': planId,
+      success_url: `${returnTo}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${returnTo}/?checkout=cancelled`,
+    });
+    res.status(201).json({ url: session.url });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Confirms a finished checkout and reports whether its subscription is still active
+app.get('/api/billing/session/:id', async (req, res, next) => {
+  const { id } = req.params;
+  if (!CHECKOUT_SESSION_ID.test(id)) return next(apiError(404, 'CHECKOUT_NOT_FOUND', 'No checkout with that id.'));
+  try {
+    const session = await stripeRequest('GET', `checkout/sessions/${id}`, { 'expand[]': 'subscription' });
+    const sub = session.subscription;
+    const active = session.status === 'complete' && ['trialing', 'active'].includes(sub?.status);
+    const toIso = (seconds) => (seconds ? new Date(seconds * 1000).toISOString() : null);
+    res.json({
+      active,
+      plan: session.metadata?.plan || null,
+      status: sub?.status || session.status,
+      trialEndsAt: toIso(sub?.trial_end),
+      renewsAt: toIso(sub?.current_period_end ?? sub?.items?.data?.[0]?.current_period_end),
+    });
+  } catch (err) {
+    next(err);
   }
 });
 
