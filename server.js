@@ -142,6 +142,50 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
+// Sample scripts for users to read aloud, stored as one JSON file in the bucket.
+// Edit prompts/scripts.json and run `npm run prompts:upload`; changes show within a minute.
+const PROMPTS_CACHE_MS = 60 * 1000;
+let promptsCache = { data: null, loadedAt: 0 };
+
+async function loadPrompts() {
+  if (promptsCache.data && Date.now() - promptsCache.loadedAt < PROMPTS_CACHE_MS) return promptsCache.data;
+  let data;
+  try {
+    data = await readSaved(bucket.file('prompts/scripts.json'));
+  } catch (err) {
+    console.error('Loading prompts failed:', err.message);
+    throw apiError(502, 'STORAGE_FAILED', 'Could not load the sample scripts. Please try again.');
+  }
+  if (!Array.isArray(data?.prompts)) {
+    throw apiError(503, 'PROMPTS_UNAVAILABLE', 'Sample scripts are not available yet.');
+  }
+  promptsCache = { data, loadedAt: Date.now() };
+  return data;
+}
+
+app.get('/api/prompts', async (req, res, next) => {
+  try {
+    const { prompts, updatedAt } = await loadPrompts();
+    const { focus, difficulty } = req.query;
+    const matching = prompts.filter(
+      (p) => (!focus || p.focus.includes(focus)) && (!difficulty || p.difficulty === difficulty),
+    );
+    res.json({ updatedAt, prompts: matching });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.get('/api/prompts/:id', async (req, res, next) => {
+  try {
+    const prompt = (await loadPrompts()).prompts.find((p) => p.id === req.params.id);
+    if (!prompt) return next(apiError(404, 'PROMPT_NOT_FOUND', 'No sample script with that id.'));
+    res.json(prompt);
+  } catch (err) {
+    next(err);
+  }
+});
+
 app.post('/api/recordings', upload.single('audio'), async (req, res, next) => {
   const file = req.file;
   if (!file) return next(apiError(400, 'MISSING_FILE', 'Send the recording as multipart form field "audio".'));

@@ -209,6 +209,59 @@ The result is saved. Calling it again returns the saved report instantly without
 | 502 | `TRANSCRIPTION_FAILED` / `STORAGE_FAILED` | Safe to retry |
 | 504 | `ANALYSIS_TIMEOUT` / `TRANSCRIPTION_TIMEOUT` | Took too long; safe to retry |
 
+## GET /api/prompts
+
+Sample scripts for users to read aloud while they practise. Each one targets a speaking habit, using the same names as the analysis `feedback` categories, so after an analysis you can suggest scripts for the user's weakest area: `GET /api/prompts?focus=opening`.
+
+**Query (optional):** `focus` (one of `filler`, `repetition`, `opening`, `clarity`, `structure`, `pacing`, `ending`), `difficulty` (`beginner`, `intermediate`, `advanced`). Without them, all scripts are returned.
+
+**Response 200**
+
+```json
+{
+  "updatedAt": "2026-10-10T11:56:08.918Z",
+  "prompts": [
+    {
+      "id": "example-script",
+      "title": "Example title",
+      "category": "Tutorial",
+      "difficulty": "beginner",
+      "focus": ["opening"],
+      "script": "The text the user reads aloud.",
+      "tips": ["A short tip for reading it well."],
+      "wordCount": 7,
+      "estimatedSeconds": 3
+    }
+  ]
+}
+```
+
+`estimatedSeconds` assumes a comfortable 150 words per minute. `prompts` is empty when nothing matches the filters, or before any scripts have been added.
+
+**Errors**: 503 `PROMPTS_UNAVAILABLE` (no scripts uploaded yet), 502 `STORAGE_FAILED` (safe to retry).
+
+### GET /api/prompts/:id
+
+One script by `id`, same shape as an item above. **Errors**: 404 `PROMPT_NOT_FOUND`.
+
+### Adding or editing scripts
+
+Scripts live in `gs://hackucd-storage/prompts/scripts.json`. To change them, edit `prompts/scripts.json` in the repo and run `npm run prompts:upload`. The API picks up changes within a minute, with no redeploy.
+
+Each entry in `"prompts"` needs:
+
+| Field | Rules |
+| --- | --- |
+| `id` | Unique, lowercase with dashes, e.g. `strong-outro` |
+| `title` | Short name shown to the user |
+| `category` | Free text, e.g. `Tutorial`, `Storytime` |
+| `difficulty` | `beginner`, `intermediate` or `advanced` |
+| `focus` | One or more of `filler`, `repetition`, `opening`, `clarity`, `structure`, `pacing`, `ending` |
+| `script` | The text to read aloud |
+| `tips` | List of short reading tips; `[]` if none |
+
+Don't add `wordCount` or `estimatedSeconds`; the upload fills them in. If anything is wrong, the upload refuses and lists every problem.
+
 ## Billing (Stripe)
 
 Two plans, both with a **7-day free trial** (card taken at sign-up, charged when the trial ends):

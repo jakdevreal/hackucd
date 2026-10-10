@@ -1,3 +1,5 @@
 node_modules/
 .env
 apikey
+api-key
+stripe-key
