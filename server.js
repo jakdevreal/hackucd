@@ -6,6 +6,7 @@ import express from 'express';
 import multer from 'multer';
 import { Storage } from '@google-cloud/storage';
 import { transcribe, TranscriptionError } from './transcribe.js';
+import { analyze, AnalysisError } from './analyze.js';
 
 const app = express();
 const PORT = process.env.PORT || 8080; // Cloud Run injects PORT
@@ -14,6 +15,7 @@ const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB) || 128;
 const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
 const UPLOAD_URL_MINUTES = 15;
 const TRANSCRIBE_TIMEOUT_SECONDS = Number(process.env.TRANSCRIBE_TIMEOUT_SECONDS) || 240;
+const ANALYSIS_TIMEOUT_SECONDS = Number(process.env.ANALYSIS_TIMEOUT_SECONDS) || 90;
 const RECORDING_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 // Subscription plans sold through Stripe Checkout. Prices in cents.
@@ -233,25 +235,40 @@ app.post('/api/recordings/:id/complete', async (req, res, next) => {
   }
 });
 
-app.post('/api/recordings/:id/transcript', async (req, res, next) => {
-  const { id } = req.params;
-  if (!RECORDING_ID.test(id)) return next(apiError(404, 'RECORDING_NOT_FOUND', 'No recording with that id.'));
+// Reads a saved JSON result from the bucket, or null if there isn't one yet
+async function readSaved(file) {
+  const [exists] = await file.exists();
+  if (!exists) return null;
+  const [saved] = await file.download();
+  return JSON.parse(saved);
+}
 
+// Saving is best-effort: the user still gets their result, it just won't be cached
+async function saveResult(file, data) {
+  try {
+    await file.save(JSON.stringify(data), { contentType: 'application/json', resumable: false });
+  } catch (err) {
+    console.error(`Saving ${file.name} failed:`, err.message);
+  }
+}
+
+const storageError = (err) => {
+  console.error('Cloud Storage read failed:', err.message);
+  return apiError(502, 'STORAGE_FAILED', 'Could not load the recording. Please try again.');
+};
+
+// Returns the saved transcript, transcribing the recording first if needed
+async function getTranscript(id) {
   const transcriptFile = bucket.file(`transcripts/${id}.json`);
   let recordingFile;
   try {
-    // Already transcribed: return the saved copy instead of paying for it again
-    const [exists] = await transcriptFile.exists();
-    if (exists) {
-      const [saved] = await transcriptFile.download();
-      return res.json(JSON.parse(saved));
-    }
+    const saved = await readSaved(transcriptFile);
+    if (saved) return saved;
     [[recordingFile]] = await bucket.getFiles({ prefix: `recordings/${id}.` });
   } catch (err) {
-    console.error('Cloud Storage read failed:', err.message);
-    return next(apiError(502, 'STORAGE_FAILED', 'Could not load the recording. Please try again.'));
+    throw storageError(err);
   }
-  if (!recordingFile) return next(apiError(404, 'RECORDING_NOT_FOUND', 'No recording with that id.'));
+  if (!recordingFile) throw apiError(404, 'RECORDING_NOT_FOUND', 'No recording with that id.');
 
   const workDir = await mkdtemp(path.join(tmpdir(), 'transcribe-'));
   try {
@@ -259,8 +276,7 @@ app.post('/api/recordings/:id/transcript', async (req, res, next) => {
     try {
       await recordingFile.download({ destination: audioPath });
     } catch (err) {
-      console.error('Cloud Storage download failed:', err.message);
-      throw apiError(502, 'STORAGE_FAILED', 'Could not load the recording. Please try again.');
+      throw storageError(err);
     }
 
     let result;
@@ -277,17 +293,57 @@ app.post('/api/recordings/:id/transcript', async (req, res, next) => {
     }
 
     const transcript = { recordingId: id, ...result, createdAt: new Date().toISOString() };
-    try {
-      await transcriptFile.save(JSON.stringify(transcript), { contentType: 'application/json', resumable: false });
-    } catch (err) {
-      // Still give the user their transcript; it just won't be cached
-      console.error('Saving transcript failed:', err.message);
-    }
-    res.json(transcript);
-  } catch (err) {
-    next(err);
+    await saveResult(transcriptFile, transcript);
+    return transcript;
   } finally {
     await rm(workDir, { recursive: true, force: true });
+  }
+}
+
+app.post('/api/recordings/:id/transcript', async (req, res, next) => {
+  const { id } = req.params;
+  if (!RECORDING_ID.test(id)) return next(apiError(404, 'RECORDING_NOT_FOUND', 'No recording with that id.'));
+  try {
+    res.json(await getTranscript(id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post('/api/recordings/:id/analysis', async (req, res, next) => {
+  const { id } = req.params;
+  if (!RECORDING_ID.test(id)) return next(apiError(404, 'RECORDING_NOT_FOUND', 'No recording with that id.'));
+
+  const analysisFile = bucket.file(`analyses/${id}.json`);
+  try {
+    let saved;
+    try {
+      saved = await readSaved(analysisFile);
+    } catch (err) {
+      throw storageError(err);
+    }
+    if (saved) return res.json(saved);
+
+    const transcript = await getTranscript(id);
+    let result;
+    try {
+      result = await analyze(transcript, {
+        apiKey: process.env.OPENROUTER_API_KEY,
+        signal: AbortSignal.timeout(ANALYSIS_TIMEOUT_SECONDS * 1000),
+      });
+    } catch (err) {
+      if (!(err instanceof AnalysisError)) throw err;
+      console.error(`Analysis failed (${err.reason}):`, err.message);
+      throw err.reason === 'timeout'
+        ? apiError(504, 'ANALYSIS_TIMEOUT', 'Analysis took too long. Please try again.')
+        : apiError(502, 'ANALYSIS_FAILED', 'Could not analyse the recording. Please try again.');
+    }
+
+    const analysis = { recordingId: id, ...result, createdAt: new Date().toISOString() };
+    await saveResult(analysisFile, analysis);
+    res.json(analysis);
+  } catch (err) {
+    next(err);
   }
 });
 

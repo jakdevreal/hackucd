@@ -149,6 +149,66 @@ The transcript is saved to Cloud Storage. Calling this again for the same record
 | 502 | `STORAGE_FAILED` | Cloud Storage error; safe to retry |
 | 504 | `TRANSCRIPTION_TIMEOUT` | Took longer than 240 s; safe to retry |
 
+## POST /api/recordings/:id/analysis
+
+The coaching report for a recording, and the one call the "Get feedback" button needs after uploading. No request body. If the recording hasn't been transcribed yet, this transcribes it first, so you don't need to call `/transcript` separately. Expect about 20 s for a 1-minute take; show a loading state.
+
+The result is saved. Calling it again returns the saved report instantly without re-analysing, so it's safe to retry and safe to call when re-opening a past recording.
+
+**Response 200**
+
+```json
+{
+  "recordingId": "8e5b7ea0-2d7b-4b0e-ae55-389b9e892465",
+  "summary": "You have a solid, specific idea here... Tighten the opening, cut the filler, and close with a clear takeaway.",
+  "strengths": ["You gave concrete details, like waking at 5 AM, which make the advice feel real."],
+  "topPriorities": ["Open by stating the topic and the payoff in your first sentence, with no greeting preamble."],
+  "feedback": [
+    {
+      "category": "repetition",
+      "quote": "basically, a lot of people ask me",
+      "start": 7.8,
+      "end": 9.8,
+      "issue": "\"Basically\" appears 5 times, and it has started to sound like a habit rather than a word you mean.",
+      "tryInstead": "Use a pause or a more specific phrase: \"Honestly, a lot of people ask me how I get so much done.\"",
+      "alternatives": ["honestly", "in short", "the truth is"]
+    }
+  ],
+  "stats": {
+    "durationSeconds": 49.2,
+    "wordCount": 139,
+    "wordsPerMinute": 169,
+    "sentenceCount": 14,
+    "fillers": {
+      "total": 10,
+      "perMinute": 12.2,
+      "byWord": [{ "word": "um", "count": 8, "moments": [{ "start": 1.02, "end": 1.2 }] }]
+    },
+    "longPauses": [{ "start": 12.4, "end": 14.1, "seconds": 1.7 }],
+    "repeatedWords": [{ "word": "basically", "count": 5, "moments": [{ "start": 7.8, "end": 8.3 }] }],
+    "sentenceOpeners": [{ "opener": "so", "count": 6 }]
+  },
+  "model": "anthropic/claude-haiku-5.5",
+  "createdAt": "2026-10-10T12:10:00.000Z"
+}
+```
+
+- **`feedback`**: 0 to 8 items, most important first. `category` is one of `filler`, `repetition`, `opening`, `clarity`, `structure`, `pacing`, `ending`. `quote` is the exact wording from the transcript, and `start`/`end` are seconds into the recording: use them to highlight the words or seek the audio player. `alternatives` is filled for `repetition` items and empty for the rest.
+- **`stats`** is measured directly from the transcript, not by the AI, so it is exact and comparable between recordings (the progress-over-time view will use it). `moments` lists every occurrence with timestamps. `longPauses` are silences of 1.5 s or more.
+- **`summary`**, **`strengths`** (1-3) and **`topPriorities`** (1-3) are short text for the top of the report.
+- For the full transcript (to show the words with highlights), call `POST /api/recordings/:id/transcript`. It is already saved by then, so it returns instantly.
+
+**Errors**
+
+| Status | `code` | When |
+| --- | --- | --- |
+| 404 | `RECORDING_NOT_FOUND` | No recording with that `id` |
+| 422 | `NO_SPEECH` | Recording has no detectable speech |
+| 422 | `UNREADABLE_AUDIO` | File could not be decoded; record again |
+| 502 | `ANALYSIS_FAILED` | AI service error or unusable reply; safe to retry |
+| 502 | `TRANSCRIPTION_FAILED` / `STORAGE_FAILED` | Safe to retry |
+| 504 | `ANALYSIS_TIMEOUT` / `TRANSCRIPTION_TIMEOUT` | Took too long; safe to retry |
+
 ## Billing (Stripe)
 
 Two plans, both with a **7-day free trial** (card taken at sign-up, charged when the trial ends):
@@ -198,4 +258,4 @@ Checks a checkout from the `session_id` Stripe returned. Call it on return from 
 
 ## Dev test page
 
-`GET /dev/record.html` is a bare page for recording from the mic (or picking a file), uploading it with the three-step flow, and transcribing it. It is for backend testing only, not part of the product.
+`GET /dev/record.html` is a bare page for recording from the mic (or picking a file), uploading it with the three-step flow, and transcribing or analysing it. It is for backend testing only, not part of the product.

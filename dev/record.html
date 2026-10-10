@@ -20,7 +20,7 @@
   <span id="timer"></span>
   <p><input type="file" id="file" accept="audio/*"></p>
   <audio id="player" controls hidden></audio>
-  <p><button id="upload" disabled>Upload</button><button id="transcribe" disabled>Transcribe</button></p>
+  <p><button id="upload" disabled>Upload</button><button id="transcribe" disabled>Transcribe</button><button id="analyse" disabled>Analyse</button></p>
   <pre id="out">No upload yet.</pre>
 
   <script>
@@ -87,7 +87,15 @@
       data = await res.json();
       show(`complete (${((Date.now() - started) / 1000).toFixed(1)}s total)`, res, data);
       recordingId = res.ok && data.id;
-      $('transcribe').disabled = !recordingId;
+      $('transcribe').disabled = $('analyse').disabled = !recordingId;
+    };
+
+    $('analyse').onclick = async () => {
+      $('out').textContent = 'Analysing… (transcribes first if needed)';
+      const started = Date.now();
+      const res = await fetch(`/api/recordings/${recordingId}/analysis`, { method: 'POST' });
+      const secs = ((Date.now() - started) / 1000).toFixed(1);
+      $('out').textContent = `${res.status} in ${secs}s\n` + JSON.stringify(await res.json(), null, 2);
     };
 
     $('transcribe').onclick = async () => {
