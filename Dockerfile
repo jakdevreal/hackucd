@@ -8,7 +8,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
-COPY server.js transcribe.js ./
+COPY *.js ./
 COPY dev ./dev
 
 CMD ["node", "server.js"]
