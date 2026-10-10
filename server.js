@@ -1,13 +1,11 @@
-import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
 import express from 'express';
 import multer from 'multer';
 import { Storage } from '@google-cloud/storage';
+import { transcribe, TranscriptionError } from './transcribe.js';
 
 const app = express();
 const PORT = process.env.PORT || 8080; // Cloud Run injects PORT
@@ -16,10 +14,7 @@ const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB) || 128;
 const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
 const UPLOAD_URL_MINUTES = 15;
 const TRANSCRIBE_TIMEOUT_SECONDS = Number(process.env.TRANSCRIBE_TIMEOUT_SECONDS) || 240;
-const TRANSCRIBE_SCRIPT = fileURLToPath(new URL('./transcribe_video.py', import.meta.url));
 const RECORDING_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-
-const execFileAsync = promisify(execFile);
 
 // Audio formats we accept, keyed by what the file's first bytes say it is.
 // We trust the bytes, not the browser's reported type: phones often send a blank
@@ -79,30 +74,17 @@ function recordingInfo(id, metadata) {
   };
 }
 
-// Runs transcribe_video.py (ffmpeg + OpenRouter) and returns its combined transcript.json
-async function runTranscription(audioPath, outputDir) {
-  if (!process.env.OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY is not set');
-  try {
-    await execFileAsync('python3', [TRANSCRIBE_SCRIPT, audioPath, '--output-dir', outputDir], {
-      timeout: TRANSCRIBE_TIMEOUT_SECONDS * 1000,
-      maxBuffer: 10 * 1024 * 1024,
-    });
-  } catch (err) {
-    if (err.killed) {
-      throw apiError(504, 'TRANSCRIPTION_TIMEOUT', 'Transcription took too long. Please try again.');
-    }
-    const detail = (err.stderr || err.message).trim();
-    console.error('Transcription failed:', detail);
-    // ffprobe/ffmpeg ran but could not decode the file
-    if (/\['ff(probe|mpeg)'.*returned non-zero exit status/.test(detail)) {
-      throw apiError(422, 'UNREADABLE_AUDIO', 'Could not read the audio in this recording. Try recording again.');
-    }
-    if (/OpenRouter/.test(detail)) {
-      throw apiError(502, 'TRANSCRIPTION_FAILED', 'The transcription service failed. Please try again.');
-    }
-    throw err; // ffmpeg/python missing or another server problem
+// Maps transcribe.js failures onto errors the frontend can show
+function transcriptionApiError(err) {
+  if (!(err instanceof TranscriptionError)) return err; // e.g. ffmpeg missing: a server problem
+  console.error(`Transcription failed (${err.reason}):`, err.message);
+  if (err.reason === 'timeout') {
+    return apiError(504, 'TRANSCRIPTION_TIMEOUT', 'Transcription took too long. Please try again.');
   }
-  return JSON.parse(await readFile(path.join(outputDir, 'transcript.json'), 'utf8'));
+  if (err.reason === 'unreadable') {
+    return apiError(422, 'UNREADABLE_AUDIO', 'Could not read the audio in this recording. Try recording again.');
+  }
+  return apiError(502, 'TRANSCRIPTION_FAILED', 'The transcription service failed. Please try again.');
 }
 
 app.use(express.json());
@@ -246,22 +228,20 @@ app.post('/api/recordings/:id/transcript', async (req, res, next) => {
       throw apiError(502, 'STORAGE_FAILED', 'Could not load the recording. Please try again.');
     }
 
-    const result = await runTranscription(audioPath, path.join(workDir, 'out'));
-    const words = (result.words || [])
-      .filter((w) => (!w.type || w.type === 'word') && String(w.word ?? '').trim())
-      .map((w) => ({ word: String(w.word).trim(), start: w.start, end: w.end }));
-    if (!result.text?.trim() || !words.length) {
+    let result;
+    try {
+      result = await transcribe(audioPath, workDir, {
+        apiKey: process.env.OPENROUTER_API_KEY,
+        signal: AbortSignal.timeout(TRANSCRIBE_TIMEOUT_SECONDS * 1000),
+      });
+    } catch (err) {
+      throw transcriptionApiError(err);
+    }
+    if (!result.text || !result.words.length) {
       throw apiError(422, 'NO_SPEECH', 'No speech was found in this recording.');
     }
 
-    const transcript = {
-      recordingId: id,
-      text: result.text.trim(),
-      duration: result.duration,
-      words,
-      model: result.model,
-      createdAt: new Date().toISOString(),
-    };
+    const transcript = { recordingId: id, ...result, createdAt: new Date().toISOString() };
     try {
       await transcriptFile.save(JSON.stringify(transcript), { contentType: 'application/json', resumable: false });
     } catch (err) {

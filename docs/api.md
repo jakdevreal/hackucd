@@ -116,7 +116,7 @@ Errors: 400 `MISSING_FILE`, 400 `EMPTY_FILE`, 400 `BAD_UPLOAD` (wrong field name
 
 ## POST /api/recordings/:id/transcript
 
-Transcribes a recording uploaded with `POST /api/recordings`, using its `id`. No request body. This can take several seconds: about 4 s for a short clip and 40 s for 5 minutes of audio, with a 240 s limit. Show a loading state.
+Transcribes a recording uploaded with `POST /api/recordings`, using its `id`. No request body. This can take several seconds: about 3 s for a short clip and 35 s for 5 minutes of audio, with a 240 s limit. Show a loading state.
 
 The transcript is saved to Cloud Storage. Calling this again for the same recording returns the saved transcript instantly, without transcribing again. Retrying after an error is safe.
 

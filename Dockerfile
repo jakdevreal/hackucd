@@ -1,14 +1,14 @@
 FROM node:24-slim
 
-# transcribe_video.py needs python3, ffmpeg and ffprobe, plus CA certs for HTTPS to OpenRouter
+# transcribe.js needs ffmpeg and ffprobe
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 ffmpeg ca-certificates \
+  && apt-get install -y --no-install-recommends ffmpeg \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
-COPY server.js transcribe_video.py ./
+COPY server.js transcribe.js ./
 COPY dev ./dev
 
 CMD ["node", "server.js"]
