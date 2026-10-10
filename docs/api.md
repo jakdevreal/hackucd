@@ -22,7 +22,13 @@ Checks that the server is up.
 
 Uploads one audio recording and saves it to Cloud Storage. Send it as `multipart/form-data` with the file in the field **`audio`**.
 
-Accepted formats: `audio/webm` (Chrome/Firefox recordings), `audio/ogg`, `audio/mp4` / `audio/x-m4a` (Safari recordings), `audio/mpeg` (mp3), `audio/wav`. A codecs suffix such as `audio/webm;codecs=opus` is fine. Max size: 25 MB.
+Use it both for in-browser recordings and for audio files the user picks from their device.
+
+Accepted formats: **webm** (Chrome/Firefox recordings), **ogg**, **m4a** (Safari recordings, phone voice memos), **mp3**, **wav**. Max size: 25 MB. Video files are rejected.
+
+The server checks the file's actual contents, not the type the browser reports, so files with a blank or wrong type (common on phones) still work, and non-audio files renamed to `.mp3` are rejected. The `contentType` in the response is the detected format (`audio/webm`, `audio/ogg`, `audio/mp4`, `audio/mpeg` or `audio/wav`).
+
+For a file picker, `<input type="file" accept="audio/*">` is enough.
 
 Recording in the browser with `MediaRecorder`:
 
@@ -57,7 +63,7 @@ Keep `id`: later endpoints (analysis) will take it.
 | 400 | `EMPTY_FILE` | File is 0 bytes |
 | 400 | `BAD_UPLOAD` | Wrong field name or more than one file |
 | 413 | `FILE_TOO_LARGE` | Over 25 MB |
-| 415 | `UNSUPPORTED_FORMAT` | Not one of the formats above |
+| 415 | `UNSUPPORTED_FORMAT` | Video file, or contents are not one of the formats above |
 | 502 | `STORAGE_FAILED` | Cloud Storage write failed; safe to retry |
 
 ## Dev test page

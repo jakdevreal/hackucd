@@ -8,17 +8,30 @@ const PORT = process.env.PORT || 8080; // Cloud Run injects PORT
 const BUCKET = process.env.GCS_BUCKET || 'hackucd-storage';
 const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB) || 25;
 
-// Formats browsers record in (MediaRecorder) plus common uploaded audio files
-const AUDIO_TYPES = {
-  'audio/webm': 'webm', // Chrome, Firefox
-  'audio/ogg': 'ogg', // Firefox
-  'audio/mp4': 'm4a', // Safari
-  'audio/x-m4a': 'm4a',
-  'audio/mpeg': 'mp3',
-  'audio/wav': 'wav',
-  'audio/x-wav': 'wav',
-  'audio/wave': 'wav',
+// Audio formats we accept, keyed by what the file's first bytes say it is.
+// We trust the bytes, not the browser's reported type: phones often send a blank
+// or generic type, and a renamed file can claim to be audio when it isn't.
+const AUDIO_FORMATS = {
+  webm: { contentType: 'audio/webm', ext: 'webm' }, // Chrome, Firefox recordings
+  ogg: { contentType: 'audio/ogg', ext: 'ogg' }, // Firefox recordings
+  mp4: { contentType: 'audio/mp4', ext: 'm4a' }, // Safari recordings, voice memos
+  mp3: { contentType: 'audio/mpeg', ext: 'mp3' },
+  wav: { contentType: 'audio/wav', ext: 'wav' },
 };
+
+function detectAudioFormat(buf) {
+  const ascii = (start, end) => buf.toString('latin1', start, end);
+  if (buf.length < 12) return null;
+  if (buf.readUInt32BE(0) === 0x1a45dfa3) return 'webm'; // EBML header
+  if (ascii(0, 4) === 'OggS') return 'ogg';
+  if (ascii(4, 8) === 'ftyp') return 'mp4';
+  if (ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WAVE') return 'wav';
+  if (ascii(0, 3) === 'ID3') return 'mp3';
+  if (buf[0] === 0xff && (buf[1] & 0xe0) === 0xe0 && (buf[1] & 0x06) !== 0) return 'mp3'; // MPEG audio frame
+  return null;
+}
+
+const VIDEO_EXTENSIONS = /\.(mp4|mov|m4v|avi|mkv|wmv|3gp)$/i;
 
 const bucket = new Storage({ projectId: process.env.GOOGLE_CLOUD_PROJECT }).bucket(BUCKET);
 
@@ -54,12 +67,16 @@ app.post('/api/recordings', upload.single('audio'), async (req, res, next) => {
   if (!file) return next(apiError(400, 'MISSING_FILE', 'Send the recording as multipart form field "audio".'));
   if (file.size === 0) return next(apiError(400, 'EMPTY_FILE', 'The recording is empty. Try recording again.'));
 
-  // Browsers send e.g. "audio/webm;codecs=opus"
-  const contentType = file.mimetype.split(';')[0].trim().toLowerCase();
-  const ext = AUDIO_TYPES[contentType];
-  if (!ext) {
-    return next(apiError(415, 'UNSUPPORTED_FORMAT', `Unsupported audio format "${contentType}". Use webm, ogg, m4a, mp3 or wav.`));
+  const declaredType = file.mimetype.split(';')[0].trim().toLowerCase();
+  if (declaredType.startsWith('video/') || (!declaredType.startsWith('audio/') && VIDEO_EXTENSIONS.test(file.originalname))) {
+    return next(apiError(415, 'UNSUPPORTED_FORMAT', 'Video files are not supported. Upload an audio file (webm, ogg, m4a, mp3 or wav).'));
   }
+
+  const format = AUDIO_FORMATS[detectAudioFormat(file.buffer)];
+  if (!format) {
+    return next(apiError(415, 'UNSUPPORTED_FORMAT', 'This file does not look like a supported audio file. Use webm, ogg, m4a, mp3 or wav.'));
+  }
+  const { contentType, ext } = format;
 
   const id = randomUUID();
   const objectPath = `recordings/${id}.${ext}`;
@@ -98,6 +115,10 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, (err) => {
+  if (err) {
+    console.error(`Could not start on port ${PORT}: ${err.message}`);
+    process.exit(1);
+  }
   console.log(`Backend listening on http://localhost:${PORT}`);
 });
