@@ -30,6 +30,7 @@ We own the **backend and storage**. Another part of the team owns the frontend.
 | Layer | Choice |
 | --- | --- |
 | Frontend | Vue.js (not ours) |
+| Frontend | Vue.js with Tailwind CSS (not ours) |
 | Backend | Node.js with Express |
 | AI | OpenRouter API |
 | Hosting | Google Cloud Run |
