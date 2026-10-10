@@ -1,3 +1,64 @@
 {
-  "prompts": []
+  "prompts": [
+    {
+      "id": "channel-intro",
+      "title": "Introduce your channel",
+      "category": "Introduction",
+      "difficulty": "beginner",
+      "focus": ["opening", "filler"],
+      "script": "Introduce yourself and your channel to a brand-new viewer.",
+      "tips": [
+        "Say who you are and what the channel is about in your first sentence.",
+        "Finish by telling them why they should subscribe."
+      ]
+    },
+    {
+      "id": "explain-a-concept",
+      "title": "Explain one concept",
+      "category": "Tutorial",
+      "difficulty": "beginner",
+      "focus": ["clarity", "structure"],
+      "script": "Pick one concept from your niche and explain it.",
+      "tips": [
+        "Explain it as if the viewer has never heard of it.",
+        "Use one concrete example instead of several vague ones."
+      ]
+    },
+    {
+      "id": "mistake-story",
+      "title": "A recent mistake",
+      "category": "Storytime",
+      "difficulty": "intermediate",
+      "focus": ["structure", "ending"],
+      "script": "Share a short story about a mistake you made recently within your niche.",
+      "tips": [
+        "Tell it in order: what happened, what went wrong, what you learned.",
+        "End on the lesson, not on \"so yeah\"."
+      ]
+    },
+    {
+      "id": "unpopular-opinion",
+      "title": "Unpopular opinion",
+      "category": "Opinion",
+      "difficulty": "advanced",
+      "focus": ["opening", "clarity", "repetition"],
+      "script": "State a view in your niche that many people disagree with, then argue for it.",
+      "tips": [
+        "Open with the opinion itself, stated plainly.",
+        "Give two or three reasons, each in its own sentence."
+      ]
+    },
+    {
+      "id": "product-recommendation",
+      "title": "Recommend a product",
+      "category": "Recommendation",
+      "difficulty": "intermediate",
+      "focus": ["pacing", "ending", "filler"],
+      "script": "Recommend a product you offer, or want to offer, to your audience.",
+      "tips": [
+        "Lead with the problem it solves for the viewer.",
+        "Close with a clear call to action."
+      ]
+    }
+  ]
 }

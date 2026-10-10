@@ -159,6 +159,12 @@ async function loadPrompts() {
   if (!Array.isArray(data?.prompts)) {
     throw apiError(503, 'PROMPTS_UNAVAILABLE', 'Sample scripts are not available yet.');
   }
+  // Skip entries that weren't added with `npm run prompts:upload` (e.g. the bucket file edited by hand)
+  const prompts = data.prompts.filter((p) => typeof p?.id === 'string' && Array.isArray(p.focus));
+  if (prompts.length < data.prompts.length) {
+    console.error(`Skipped ${data.prompts.length - prompts.length} malformed prompt(s); re-upload with npm run prompts:upload`);
+  }
+  data = { ...data, prompts };
   promptsCache = { data, loadedAt: Date.now() };
   return data;
 }
