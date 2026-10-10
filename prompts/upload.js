@@ -7,7 +7,8 @@ const SOURCE = new URL('./scripts.json', import.meta.url);
 const OBJECT = 'prompts/scripts.json';
 const WORDS_PER_MINUTE = 150; // comfortable talking-to-camera pace
 const DIFFICULTIES = ['beginner', 'intermediate', 'advanced'];
-// Same categories the analysis uses, so the frontend can suggest a script for a weak spot
+// Prompts are speaking topics, not scripts read aloud; "script" holds the topic text.
+// Same categories the analysis uses, so the frontend can suggest a topic for a weak spot
 const FOCUS = ['filler', 'repetition', 'opening', 'clarity', 'structure', 'pacing', 'ending'];
 
 const { prompts } = JSON.parse(readFileSync(SOURCE, 'utf8'));

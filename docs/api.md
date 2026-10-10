@@ -211,9 +211,9 @@ The result is saved. Calling it again returns the saved report instantly without
 
 ## GET /api/prompts
 
-Sample scripts for users to read aloud while they practise. Each one targets a speaking habit, using the same names as the analysis `feedback` categories, so after an analysis you can suggest scripts for the user's weakest area: `GET /api/prompts?focus=opening`.
+Speaking topics for users to practise with. These are not scripts read word for word: the user gets a topic ("Pick one concept from your niche and explain it"), talks about it in their own words, and the analysis coaches them on what they actually said. Each topic targets a speaking habit, using the same names as the analysis `feedback` categories, so after an analysis you can suggest topics for the user's weakest area: `GET /api/prompts?focus=opening`.
 
-**Query (optional):** `focus` (one of `filler`, `repetition`, `opening`, `clarity`, `structure`, `pacing`, `ending`), `difficulty` (`beginner`, `intermediate`, `advanced`). Without them, all scripts are returned.
+**Query (optional):** `focus` (one of `filler`, `repetition`, `opening`, `clarity`, `structure`, `pacing`, `ending`), `difficulty` (`beginner`, `intermediate`, `advanced`). Without them, all topics are returned.
 
 **Response 200**
 
@@ -227,7 +227,7 @@ Sample scripts for users to read aloud while they practise. Each one targets a s
       "category": "Tutorial",
       "difficulty": "beginner",
       "focus": ["opening"],
-      "script": "The text the user reads aloud.",
+      "script": "The topic shown to the user to talk about.",
       "tips": ["A short tip for reading it well."],
       "wordCount": 7,
       "estimatedSeconds": 3
@@ -236,9 +236,9 @@ Sample scripts for users to read aloud while they practise. Each one targets a s
 }
 ```
 
-`estimatedSeconds` assumes a comfortable 150 words per minute. `prompts` is empty when nothing matches the filters, or before any scripts have been added.
+`script` holds the topic text (the field name is kept so the response shape doesn't change). `wordCount` and `estimatedSeconds` describe the topic text itself, not how long the user should talk, so don't show them as a target length. `prompts` is empty when nothing matches the filters, or before any topics have been added.
 
-**Errors**: 503 `PROMPTS_UNAVAILABLE` (no scripts uploaded yet), 502 `STORAGE_FAILED` (safe to retry).
+**Errors**: 503 `PROMPTS_UNAVAILABLE` (no topics uploaded yet), 502 `STORAGE_FAILED` (safe to retry).
 
 ### GET /api/prompts/:id
 
