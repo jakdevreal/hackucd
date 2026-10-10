@@ -16,7 +16,7 @@
           fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
           colors: {
             primary: '#10B981', // emerald: active states, play button, brand. Buttons with white text use emerald-600 for contrast.
-            accent: '#06B6D4', // cyan: waveforms, "added" words, highlights
+            accent: '#06B6D4', // cyan: waveforms, filler words, highlights
             mint: '#A7F3D0', // positive feedback, step numbers, info banners
             warm: '#EDE9E8', // borders, dividers, subdued UI
             paper: '#FAFAF8', // app background
@@ -70,11 +70,11 @@
           Sound sharper in your <span class="text-primary">next video</span>
         </h1>
         <p class="mt-5 max-w-xl text-lg leading-8 text-stone-600">
-          Read a short script out loud and we'll lay your take over it, word by word. You'll see what you skipped, what you swapped and every "um" that crept in, along with what to try next time.
+          Pick a prompt, talk for a minute, and our AI coach points to the exact moments where you rambled, repeated yourself or said "um", with what to say instead.
         </p>
         <div class="mt-8 flex flex-wrap gap-3">
-          <button @click="startFromHero" class="rounded-xl bg-emerald-600 px-6 py-3 font-semibold text-white shadow-sm hover:bg-emerald-700">Get a script</button>
-          <a href="#example" class="rounded-xl border border-warm bg-white px-6 py-3 font-semibold hover:border-stone-300">Hear an example</a>
+          <a href="#studio" class="rounded-xl bg-emerald-600 px-6 py-3 font-semibold text-white shadow-sm hover:bg-emerald-700">Pick a prompt</a>
+          <a href="#example" class="rounded-xl border border-warm bg-white px-6 py-3 font-semibold hover:border-stone-300">See an example</a>
         </div>
         <p class="mt-4 text-sm text-stone-500">One free analysis a day. No account, no sign-up.</p>
       </div>
@@ -88,25 +88,27 @@
               <svg viewBox="0 0 24 24" class="ml-0.5 h-4 w-4" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
             </span>
             <div class="flex h-10 min-w-0 flex-1 items-center gap-[3px]">
-              <span v-for="(h, i) in heroBars" :key="i" class="flex-1 rounded-full bg-accent" :class="i < 15 ? '' : 'opacity-30'" :style="{ height: h + '%' }"></span>
+              <span v-for="(h, i) in heroBars" :key="i" class="flex-1 rounded-full bg-accent" :class="i < 12 ? '' : 'opacity-30'" :style="{ height: h + '%' }"></span>
             </div>
-            <span class="font-mono text-xs text-stone-500">0:14</span>
+            <span class="font-mono text-xs text-stone-500">0:04</span>
           </div>
           <p class="mt-5 text-[15px] leading-8 text-stone-700">
-            <span class="rounded bg-accent/15 px-1 text-cyan-900">So, um,</span> if your videos feel flat, try this before you change anything else.
-            Start with the most interesting thing you're going to say, and save the greeting for later, or cut it
-            <s class="rounded bg-red-50 px-0.5 text-red-700 decoration-red-400">completely</s>.
-            Give them that reason first, and the rest of the video gets a
-            <s class="text-stone-400">fair</s> <span class="rounded bg-amber-100 px-1 text-amber-900">real</span> chance.
+            In browsers, the same origin policy is <span class="rounded bg-amber-100 px-1 text-amber-950">sort of like<sup class="ml-0.5 font-semibold text-amber-700">1</sup></span>
+            a defense mechanism that is used more or less to protect users from malicious attackers.
           </p>
-          <div class="mt-5 grid grid-cols-3 gap-2 text-center">
-            <div class="rounded-xl bg-paper px-2 py-3"><div class="text-lg font-bold">97%</div><div class="text-[11px] text-stone-500">read as written</div></div>
-            <div class="rounded-xl bg-paper px-2 py-3"><div class="text-lg font-bold">151</div><div class="text-[11px] text-stone-500">words a minute</div></div>
-            <div class="rounded-xl bg-paper px-2 py-3"><div class="text-lg font-bold">3</div><div class="text-[11px] text-stone-500">fillers added</div></div>
+          <div class="mt-4 rounded-xl border border-warm p-4 text-sm">
+            <div class="flex items-center gap-2">
+              <span class="grid h-6 w-6 place-items-center rounded-full bg-amber-100 text-xs font-bold text-amber-900">1</span>
+              <span class="font-semibold">Your opening</span>
+            </div>
+            <p class="mt-2 leading-6 text-stone-700">The first sentence hedges twice before it gets to the point.</p>
+            <p class="mt-2 rounded-lg bg-mint/30 px-3 py-2 leading-6 text-emerald-950"><span class="font-semibold">Try instead:</span> "The same origin policy stops one website from reading another website's data in your browser."</p>
           </div>
-        </div>
-        <div class="ml-auto mr-4 mt-3 hidden max-w-xs rounded-xl border border-warm bg-white px-4 py-3 text-sm shadow-md sm:block">
-          <span class="font-semibold">At 0:25</span> you dropped "completely". Your eyes were probably a line ahead.
+          <div class="mt-4 grid grid-cols-3 gap-2 text-center">
+            <div class="rounded-xl bg-paper px-2 py-3"><div class="text-lg font-bold">{{ heroStats.pace }}</div><div class="text-[11px] text-stone-500">words a minute</div></div>
+            <div class="rounded-xl bg-paper px-2 py-3"><div class="text-lg font-bold">{{ heroStats.fillers }}</div><div class="text-[11px] text-stone-500">filler word{{ heroStats.fillers === 1 ? '' : 's' }}</div></div>
+            <div class="rounded-xl bg-paper px-2 py-3"><div class="text-lg font-bold">{{ heroStats.notes }}</div><div class="text-[11px] text-stone-500">coaching notes</div></div>
+          </div>
         </div>
       </div>
     </section>
@@ -122,48 +124,63 @@
       </div>
     </section>
 
-    <!-- Script + recorder -->
+    <!-- Prompt + recorder -->
     <section id="studio" class="scroll-mt-20 py-12">
-      <h2 class="text-2xl font-bold sm:text-3xl">1. Get a script, then record it</h2>
+      <h2 class="text-2xl font-bold sm:text-3xl">1. Pick a prompt, then talk</h2>
       <p class="mt-2 max-w-2xl text-stone-600">
-        Read it through once in your head. Then press record and read the whole thing out loud, start to finish, the way you'd say it to camera.
+        Choose a topic, then record yourself talking about it in your own words, the way you would on camera. No script, no second takes. Aim for somewhere between 30 seconds and two minutes.
       </p>
 
       <div class="mt-8 grid gap-6 lg:grid-cols-5">
-        <!-- Script card -->
+        <!-- Prompt picker -->
         <div class="flex flex-col rounded-2xl border border-warm bg-white p-5 sm:p-7 lg:col-span-3">
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <h3 class="font-semibold">Your script</h3>
-            <div class="flex flex-wrap gap-1.5" role="group" aria-label="Script style">
-              <button v-for="s in styles" :key="s.id" @click="pickStyle(s.id)" :disabled="locked"
-                      class="rounded-full border px-3 py-1 text-xs font-medium transition disabled:opacity-50"
-                      :class="style === s.id ? 'border-primary bg-mint/40 text-emerald-900' : 'border-warm text-stone-600 hover:border-stone-300'">
-                {{ s.label }}
-              </button>
-            </div>
+          <h3 class="font-semibold">Choose a prompt</h3>
+
+          <!-- BACKEND: prompts come from GET /api/prompts ({ id, text } each, from prompts/scripts.json in the
+               bucket). To add or reword one, see "Adding or editing prompts" in docs/api.md. No frontend
+               change needed: new prompts show up here within a minute. -->
+          <div v-if="promptsLoading" class="mt-4 space-y-2">
+            <div v-for="i in 5" :key="i" class="h-14 animate-pulse rounded-xl bg-paper"></div>
           </div>
 
-          <div v-if="!script" class="mt-6 flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-warm bg-paper px-6 py-14 text-center">
-            <p class="max-w-sm text-stone-600">Pick a style and we'll give you something short to read. Most scripts take 30 to 45 seconds out loud.</p>
-            <button @click="newScript" :disabled="scriptLoading"
-                    class="mt-5 rounded-xl bg-emerald-600 px-6 py-3 font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-60">
-              {{ scriptLoading ? 'Writing…' : 'Give me a script' }}
+          <div v-else-if="promptsError" class="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">
+            We couldn't load the prompts. {{ promptsError }}
+            <button @click="loadPrompts" class="ml-1 font-semibold underline">Try again</button>
+          </div>
+
+          <div v-else-if="!promptList.length" class="mt-4 rounded-xl border border-dashed border-warm bg-paper p-6 text-center text-sm text-stone-500">
+            There aren't any prompts yet. Check back in a little while.
+          </div>
+
+          <div v-else class="mt-4 space-y-2" role="radiogroup" aria-label="Prompts">
+            <button v-for="(p, i) in promptList" :key="p.id" @click="choosePrompt(p.id)" :disabled="locked"
+                    role="radio" :aria-checked="promptId === p.id"
+                    class="flex w-full items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60"
+                    :class="promptId === p.id ? 'border-primary bg-mint/20' : 'border-warm hover:border-stone-300'">
+              <span class="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold"
+                    :class="promptId === p.id ? 'bg-primary text-white' : 'bg-paper text-stone-500'">{{ i + 1 }}</span>
+              <span class="leading-6">{{ p.text }}</span>
             </button>
           </div>
 
-          <template v-else>
-            <p class="mt-6 flex-1 text-xl leading-9 text-stone-800 sm:text-[1.375rem] sm:leading-10">{{ script.text }}</p>
-            <div class="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-warm pt-4 text-sm">
-              <span class="text-stone-500">{{ styleLabel(script.style) }} · {{ scriptWords }} words · about {{ fmtTime(scriptSeconds) }} out loud</span>
-              <button @click="newScript" :disabled="locked || scriptLoading"
-                      class="rounded-lg border border-warm px-3 py-1.5 font-semibold text-stone-700 hover:border-stone-300 disabled:opacity-50">
-                {{ scriptLoading ? 'Writing…' : 'Try another' }}
-              </button>
+          <!-- Selected prompt -->
+          <div v-if="selectedPrompt" class="mt-6 flex-1 border-t border-warm pt-6">
+            <div class="text-xs font-medium uppercase tracking-wide text-stone-500">Your prompt</div>
+            <p class="mt-2 text-xl font-semibold leading-8 text-stone-900 sm:text-2xl sm:leading-9">{{ selectedPrompt.text }}</p>
+            <div class="mt-5 rounded-xl bg-paper p-4">
+              <div class="text-sm font-semibold">A few things that help</div>
+              <ul class="mt-2 space-y-1.5 text-sm leading-6 text-stone-700">
+                <li v-for="tip in promptTips" :key="tip" class="flex gap-2"><span class="text-primary">→</span><span>{{ tip }}</span></li>
+              </ul>
             </div>
-          </template>
+            <p class="mt-4 text-sm text-stone-500">As well as how you said it, we'll check whether you answered the prompt and stayed on it.</p>
+          </div>
+          <p v-else-if="promptList.length" class="mt-6 border-t border-warm pt-6 text-sm text-stone-500">
+            Pick one to get started. There's no wrong choice; start with whichever you could talk about right now.
+          </p>
         </div>
 
-        <!-- Recorder card -->
+        <!-- Recorder -->
         <div id="recorder" class="flex flex-col rounded-2xl border border-warm bg-white p-5 sm:p-7 lg:col-span-2">
           <div class="flex items-center justify-between">
             <h3 class="font-semibold">Record</h3>
@@ -174,13 +191,15 @@
 
           <canvas ref="wave" class="mt-4 h-24 w-full rounded-xl bg-paper"></canvas>
 
-          <!-- On phones the script sits above the fold, so repeat it here while recording -->
-          <p v-if="state === 'recording' && script" class="mt-4 max-h-64 overflow-y-auto rounded-xl bg-paper p-4 text-lg leading-8 lg:hidden">{{ script.text }}</p>
+          <!-- On phones the prompt sits above the fold, so repeat it here while recording -->
+          <div v-if="state === 'recording' && selectedPrompt" class="mt-4 rounded-xl bg-paper p-4 lg:hidden">
+            <p class="font-semibold leading-7">{{ selectedPrompt.text }}</p>
+          </div>
 
           <div class="mt-5 flex flex-col items-center gap-4">
             <div class="font-mono text-3xl tabular-nums" :class="state === 'recording' ? 'text-primary' : 'text-stone-400'">{{ clock }}</div>
 
-            <button v-if="state !== 'recording'" @click="startRecording" :disabled="!script || !!busy"
+            <button v-if="state !== 'recording'" @click="startRecording" :disabled="!selectedPrompt || !!busy"
                     class="flex items-center gap-2 rounded-full bg-emerald-600 px-7 py-3 font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-warm disabled:text-stone-400 disabled:shadow-none">
               <span class="h-3 w-3 rounded-full bg-current"></span>
               {{ audioBlob ? 'Record again' : 'Start recording' }}
@@ -190,9 +209,9 @@
               <span class="h-3 w-3 rounded-sm bg-white"></span> I'm done
             </button>
 
-            <p v-if="!script" class="text-center text-sm text-stone-500">Get a script first. It's what we'll compare your take against.</p>
+            <p v-if="!selectedPrompt" class="text-center text-sm text-stone-500">Pick a prompt first, so we know what you're aiming for.</p>
             <label v-else-if="state !== 'recording' && !busy" class="cursor-pointer text-center text-sm text-stone-600 underline decoration-warm underline-offset-4 hover:text-stone-900">
-              or upload a recording of you reading it
+              or upload a recording instead
               <input type="file" accept="audio/*" class="hidden" @change="pickFile">
             </label>
           </div>
@@ -208,7 +227,7 @@
               {{ busy || 'Get feedback' }}
             </button>
             <p class="text-center text-xs text-stone-500">
-              <template v-if="busy">This usually takes 5 to 40 seconds, depending on length.</template>
+              <template v-if="busy">This usually takes 15 to 40 seconds, depending on length.</template>
               <template v-else-if="isPro">Unlimited with Pro</template>
               <template v-else-if="freeLeft">This uses today's free analysis</template>
               <template v-else>Today's free analysis is used</template>
@@ -223,8 +242,8 @@
 
           <div class="mt-auto pt-6">
             <div class="rounded-xl bg-mint/30 p-4 text-sm leading-6 text-emerald-950">
-              <span class="font-semibold">Why a script?</span>
-              When the words are fixed, the only thing left to judge is how you say them. It's the quickest way to hear your own habits, and they're the same ones that show up when you talk off the cuff.
+              <span class="font-semibold">Why a prompt?</span>
+              A topic takes away the "what do I even say" part, so you can focus on how you say it. It also gives us something to check your take against: did you answer it, and did you stay on it?
             </div>
           </div>
         </div>
@@ -234,28 +253,27 @@
     <!-- Feedback for the user's own take -->
     <section id="feedback" class="scroll-mt-20 py-12">
       <h2 class="text-2xl font-bold sm:text-3xl">2. Your feedback</h2>
-      <p v-if="report" class="mt-2 max-w-2xl text-stone-600">Here's your take laid over the script. Play it back, then read the notes on the right.</p>
+      <p v-if="report" class="mt-2 max-w-2xl text-stone-600">For "{{ report.prompt.text }}" Play it back, then work down the notes.</p>
 
       <div v-if="!report" class="mt-8 rounded-2xl border border-dashed border-warm px-6 py-14 text-center text-stone-500">
-        Your feedback will show up here once you've recorded your script.<br class="hidden sm:inline">
+        Your feedback will show up here after you record a take.<br class="hidden sm:inline">
         Not ready yet? <a href="#example" class="font-semibold text-stone-700 underline decoration-warm underline-offset-4">Have a look at the example</a> to see what you'll get.
       </div>
-      <report-view v-else class="mt-8" :report="report"></report-view>
+      <report-view v-else class="mt-8" :report="report" :next="nextPromptFor(report)" @use-prompt="usePrompt"></report-view>
     </section>
 
     <!-- Example report -->
     <section id="example" class="scroll-mt-20 border-t border-warm py-12">
-      <h2 class="text-2xl font-bold sm:text-3xl">Hear an example</h2>
+      <h2 class="text-2xl font-bold sm:text-3xl">See an example</h2>
       <p class="mt-2 max-w-2xl text-stone-600">
-        A first read of one of our quick-tip scripts. It isn't perfect, and that's the point: this is what a normal take looks like, and what we'd say about it.
+        A real first take on "Pick one concept from your niche and explain it." One go, no script, and below is exactly what our AI coach said about it.
       </p>
       <p class="mt-6 rounded-xl bg-mint/50 px-4 py-2 text-sm text-emerald-900">
         This is an example report. Record your own take to get one for your voice.
       </p>
-      <!-- BACKEND: sample audio + feedback slot. The audio file and transcript are set in the
-           script near the top (SAMPLE_AUDIO_URL and SAMPLE_TRANSCRIPT). The play button and the
-           waveform switch on by themselves once SAMPLE_AUDIO_URL points at a real file. -->
-      <report-view class="mt-6" :report="sampleReport"></report-view>
+      <!-- BACKEND: sample audio + feedback slot. The audio, transcript and analysis are set near the top of
+           the script (SAMPLE_AUDIO_URL, SAMPLE_TRANSCRIPT, SAMPLE_ANALYSIS). -->
+      <report-view class="mt-6" :report="sampleReport" :next="nextPromptFor(sampleReport)" @use-prompt="usePrompt"></report-view>
     </section>
   </main>
 
@@ -305,46 +323,79 @@
   </div>
 </div>
 
-<!-- Report: playback, script comparison, stats and written feedback. Used for both the user's take and the example. -->
+<!-- One coaching note from the analysis -->
+<template id="note-tpl">
+  <div class="rounded-xl border border-warm bg-white p-4">
+    <div class="flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2">
+        <span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-amber-100 text-xs font-bold text-amber-900">{{ n }}</span>
+        <span v-if="label" class="text-sm font-semibold">{{ label }}</span>
+      </div>
+      <button v-if="canSeek" @click="$emit('seek', note.start)" :aria-label="'Play from ' + fmtTime(note.start)"
+              class="flex items-center gap-1 rounded-md px-2 py-1 font-mono text-xs text-stone-500 hover:bg-warm hover:text-stone-800">
+        <svg viewBox="0 0 24 24" class="h-3 w-3" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>{{ fmtTime(note.start) }}
+      </button>
+      <span v-else class="font-mono text-xs text-stone-400">{{ fmtTime(note.start) }}</span>
+    </div>
+    <p class="mt-3 border-l-2 border-amber-200 pl-3 text-sm italic leading-6 text-stone-600">"{{ note.quote }}"</p>
+    <p class="mt-3 text-sm leading-6 text-stone-800">{{ note.issue }}</p>
+    <p class="mt-3 rounded-lg bg-mint/30 px-3 py-2 text-sm leading-6 text-emerald-950"><span class="font-semibold">Try instead:</span> {{ note.tryInstead }}</p>
+    <p v-if="note.alternatives && note.alternatives.length" class="mt-2 text-xs text-stone-500">Other words you could reach for: {{ note.alternatives.join(', ') }}</p>
+  </div>
+</template>
+
+<!-- Report: playback, transcript, coaching notes, stats and summary. Used for the user's take and the example. -->
 <template id="report-tpl">
   <div class="grid gap-6 lg:grid-cols-3">
     <div class="min-w-0 space-y-6 lg:col-span-2">
       <!-- Playback -->
       <div class="rounded-2xl border border-warm bg-white p-5 sm:p-6">
         <div class="flex items-center gap-4 sm:gap-6">
-          <button @click="togglePlay" :disabled="!report.audioUrl" :aria-label="playing ? 'Pause' : 'Play'"
+          <button @click="togglePlay" :disabled="!canPlay" :aria-label="playing ? 'Pause' : 'Play'"
                   class="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-primary text-white shadow-sm transition hover:bg-emerald-600 disabled:bg-warm disabled:text-stone-400 disabled:shadow-none">
             <svg v-if="!playing" viewBox="0 0 24 24" class="ml-1 h-6 w-6" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
             <svg v-else viewBox="0 0 24 24" class="h-6 w-6" fill="currentColor"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
           </button>
           <div class="min-w-0 flex-1">
-            <canvas ref="wave" @click="seekFromWave" class="h-20 w-full" :class="report.audioUrl ? 'cursor-pointer' : ''"></canvas>
+            <canvas ref="wave" @click="seekFromWave" class="h-20 w-full" :class="canPlay ? 'cursor-pointer' : ''"></canvas>
             <div class="mt-1 flex justify-between font-mono text-xs text-stone-500">
-              <span>{{ fmtTime(playTime) }}</span><span>{{ fmtTime(report.duration) }}</span>
+              <span>{{ fmtTime(playTime) }}</span><span>{{ fmtTime(duration) }}</span>
             </div>
           </div>
         </div>
-        <p v-if="!report.audioUrl" class="mt-4 rounded-lg border border-dashed border-warm bg-paper px-3 py-2 text-sm text-stone-500">{{ report.noAudioNote }}</p>
+        <p v-if="!canPlay" class="mt-4 rounded-lg border border-dashed border-warm bg-paper px-3 py-2 text-sm text-stone-500">We couldn't load the audio for this take, but everything below still applies.</p>
         <audio v-if="report.audioUrl" ref="player" :src="report.audioUrl" preload="metadata" class="hidden"
-               @play="onPlay" @pause="playing = false" @ended="onEnded"></audio>
+               @play="onPlay" @pause="playing = false" @ended="onEnded" @error="audioFailed = true"></audio>
       </div>
 
-      <!-- Script vs. what was said -->
+      <!-- Transcript with highlights -->
       <div class="rounded-2xl border border-warm bg-white p-5 sm:p-6">
         <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h3 class="font-semibold">The script, next to what you said</h3>
-          <span class="text-sm text-stone-500">{{ c.matched }} of {{ c.total }} words as written</span>
+          <h3 class="font-semibold">Your take, word for word</h3>
+          <span class="text-sm text-stone-500">{{ s.wordCount }} words</span>
         </div>
+        <p class="mt-2 text-sm text-stone-500">Prompt: {{ report.prompt.text }}</p>
         <div class="mt-3 flex flex-wrap gap-2 text-xs font-medium">
-          <span class="rounded-full bg-red-50 px-2.5 py-1 text-red-800"><s class="decoration-red-400">Skipped</s> · {{ c.skippedWords }}</span>
-          <span class="rounded-full bg-amber-100 px-2.5 py-1 text-amber-900">Swapped · {{ c.swaps.length }}</span>
-          <span class="rounded-full bg-accent/15 px-2.5 py-1 text-cyan-900">Added · {{ c.addedWords }}</span>
-          <span v-if="c.unread" class="rounded-full bg-stone-100 px-2.5 py-1 text-stone-500">Not reached · {{ c.unread }}</span>
+          <span class="rounded-full bg-amber-100 px-2.5 py-1 text-amber-900">Coaching note</span>
+          <span class="rounded-full bg-accent/15 px-2.5 py-1 text-cyan-900">Filler word</span>
+          <span class="rounded-full bg-stone-100 px-2.5 py-1 text-stone-500">Long pause</span>
         </div>
         <p class="mt-5 text-lg leading-9 text-stone-800">
-          <template v-for="(item, i) in c.items" :key="i"><span v-if="item.type === 'ok'" @click="seekTo(item.start)" :class="seekable">{{ item.text }}</span><s v-else-if="item.type === 'skipped'" class="rounded bg-red-50 px-0.5 text-red-700 decoration-red-400" title="Skipped">{{ item.text }}</s><span v-else-if="item.type === 'swap'" @click="seekTo(item.start)" :title="'You said: ' + item.said"><s class="text-stone-400">{{ item.expected }}</s> <span class="rounded bg-amber-100 px-1 text-amber-900">{{ item.said }}</span></span><span v-else-if="item.type === 'added'" @click="seekTo(item.start)" class="rounded bg-accent/15 px-1 text-cyan-900" title="Not in the script">{{ item.text }}</span><span v-else class="text-stone-300" title="Not reached">{{ item.text }}</span>{{ ' ' }}</template>
+          <template v-for="(seg, i) in segments" :key="i"><span v-if="seg.type === 'plain'">{{ seg.text }}</span><span v-else-if="seg.type === 'note'" @click="seekTo(seg.start)" class="rounded bg-amber-100 px-1 text-amber-950" :class="seekClass">{{ seg.text }}<sup class="ml-0.5 font-semibold text-amber-700">{{ seg.n }}</sup></span><span v-else-if="seg.type === 'filler'" @click="seekTo(seg.start)" class="rounded bg-accent/15 px-1 text-cyan-900" :class="seekClass">{{ seg.text }}</span><span v-else class="inline-block rounded-full bg-stone-100 px-2 align-middle text-xs leading-6 text-stone-500">{{ seg.text }}</span>{{ ' ' }}</template>
         </p>
-        <p v-if="report.audioUrl" class="mt-4 text-xs text-stone-500">Tap any word you said to hear that moment.</p>
+        <p v-if="canPlay" class="mt-4 text-xs text-stone-500">Tap any highlight to hear that moment. The numbers match the notes below.</p>
+      </div>
+
+      <!-- Coaching notes from the AI, most important first -->
+      <div class="rounded-2xl border border-warm bg-white p-5 sm:p-6">
+        <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h3 class="font-semibold">Moments to work on</h3>
+          <span class="text-sm text-stone-500">Most important first</span>
+        </div>
+        <div v-if="numbered.length" class="mt-4 grid gap-3 md:grid-cols-2">
+          <note-card v-for="x in numbered" :key="x.n" :note="x.note" :n="x.n" :label="x.label" :can-seek="canPlay" @seek="seekTo"></note-card>
+        </div>
+        <p v-else class="mt-3 text-sm leading-6 text-stone-600">Nothing specific to fix this time. That's rare on a first take, so enjoy it, then try a harder prompt.</p>
       </div>
     </div>
 
@@ -356,11 +407,74 @@
           <div class="mt-0.5 text-xs leading-5 text-stone-500">{{ t.note }}</div>
         </div>
       </div>
+
+      <!-- Coaching summary from the AI -->
       <div class="rounded-2xl border border-warm bg-white p-5 sm:p-6">
-        <h3 class="font-semibold">What to work on</h3>
-        <!-- BACKEND: this paragraph is written in the browser by buildSummary(). See getFeedback()
-             for how to swap in the AI paragraph from POST /api/recordings/:id/analysis instead. -->
-        <p class="mt-3 leading-7 text-stone-700">{{ report.summary }}</p>
+        <h3 class="font-semibold">The short version</h3>
+        <p class="mt-3 leading-7 text-stone-700">{{ a.summary }}</p>
+        <div v-if="a.strengths.length" class="mt-5">
+          <div class="text-sm font-semibold">What worked</div>
+          <ul class="mt-2 space-y-2 text-sm leading-6 text-stone-700">
+            <li v-for="s in a.strengths" :key="s" class="flex gap-2"><span class="text-primary">✓</span><span>{{ s }}</span></li>
+          </ul>
+        </div>
+        <div v-if="a.topPriorities.length" class="mt-5">
+          <div class="text-sm font-semibold">For your next take</div>
+          <ol class="mt-2 space-y-2 text-sm leading-6 text-stone-700">
+            <li v-for="(p, i) in a.topPriorities" :key="p" class="flex gap-2"><span class="font-semibold text-emerald-700">{{ i + 1 }}.</span><span>{{ p }}</span></li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- Measured habits -->
+      <div class="rounded-2xl border border-warm bg-white p-5 sm:p-6">
+        <h3 class="font-semibold">Habits we counted</h3>
+        <p class="mt-1 text-xs leading-5 text-stone-500">Measured straight from your words, so you can compare one take with the next.</p>
+
+        <div v-if="s.fillers.byWord.length" class="mt-5">
+          <div class="text-sm font-semibold">Filler words</div>
+          <div v-for="f in s.fillers.byWord" :key="f.word" class="mt-2 flex items-center gap-3 text-sm">
+            <span class="w-20 shrink-0 truncate text-stone-700">"{{ f.word }}"</span>
+            <span class="h-2 flex-1 rounded-full bg-paper"><span class="block h-2 rounded-full bg-accent" :style="{ width: (f.count / maxFiller * 100) + '%' }"></span></span>
+            <span class="w-8 text-right font-mono text-xs text-stone-500">×{{ f.count }}</span>
+          </div>
+        </div>
+
+        <div v-if="s.repeatedWords.length" class="mt-5">
+          <div class="text-sm font-semibold">Words you leaned on</div>
+          <div class="mt-2 flex flex-wrap gap-1.5">
+            <span v-for="r in s.repeatedWords.slice(0, 6)" :key="r.word" class="rounded-full bg-paper px-2.5 py-1 text-xs text-stone-700">{{ r.word }} <span class="text-stone-400">×{{ r.count }}</span></span>
+          </div>
+        </div>
+
+        <div v-if="s.sentenceOpeners.length" class="mt-5">
+          <div class="text-sm font-semibold">How your sentences start</div>
+          <ul class="mt-2 space-y-1 text-sm text-stone-700">
+            <li v-for="o in s.sentenceOpeners.slice(0, 3)" :key="o.opener">{{ o.count }} sentences start with "{{ o.opener }}"</li>
+          </ul>
+        </div>
+
+        <div v-if="s.longPauses.length" class="mt-5">
+          <div class="text-sm font-semibold">Long pauses</div>
+          <div class="mt-2 flex flex-wrap gap-1.5">
+            <button v-for="p in s.longPauses" :key="p.start" @click="seekTo(p.start)" :disabled="!canPlay"
+                    class="rounded-full bg-paper px-2.5 py-1 font-mono text-xs text-stone-700 enabled:hover:bg-warm">{{ p.seconds.toFixed(1) }}s at {{ fmtTime(p.start) }}</button>
+          </div>
+        </div>
+
+        <p v-if="!s.fillers.byWord.length && !s.repeatedWords.length && !s.sentenceOpeners.length && !s.longPauses.length" class="mt-4 text-sm text-stone-600">
+          Nothing stood out. That's a clean take.
+        </p>
+      </div>
+
+      <!-- Suggested next prompt -->
+      <div v-if="next" class="rounded-2xl border border-warm bg-mint/20 p-5 sm:p-6">
+        <h3 class="font-semibold">Practise next</h3>
+        <p class="mt-2 text-sm leading-6 text-stone-700">
+          Most of the notes this time were about {{ next.area }}. Keep that in mind on a fresh topic:
+        </p>
+        <p class="mt-2 font-semibold leading-6">"{{ next.prompt.text }}"</p>
+        <button @click="$emit('use-prompt', next.prompt.id)" class="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Use this prompt</button>
       </div>
     </div>
   </div>
@@ -370,79 +484,186 @@
   // BACKEND: the deployed backend from this repo (server.js). For a local backend use 'http://localhost:8080'.
   const API_URL = 'https://hackucd-backend-177345674775.europe-west1.run.app';
 
-  // BACKEND: AI-written scripts. Flip USE_SCRIPT_API to true once this endpoint exists:
-  //   POST /api/scripts   body: { "style": "tip" | "review" | "day" | "story", "previousId": "tip-1" }
-  //   201 → { "id": "abc123", "style": "tip", "text": "One paragraph, 70 to 110 words." }
-  // Generate it with OpenRouter on the server (the key stays server-side). Ask the model for plain
-  // spoken sentences only: no headings, emoji, stage directions, brackets or dashes, because every
-  // word in `text` is compared against what the user says. If the call fails we quietly fall back
-  // to the built-in SCRIPTS below, so the user is never stuck. Add the endpoint to docs/api.md.
-  const USE_SCRIPT_API = false;
-
-  // BACKEND: sample audio + transcript for the "Hear an example" section.
-  // 1. Record someone reading SCRIPTS.tip[0] below. Keep the natural slip-ups, they make it useful.
-  // 2. Upload it the normal way and paste the JSON from POST /api/recordings/:id/transcript into
-  //    SAMPLE_TRANSCRIPT (the whole object: { text, duration, words: [{ word, start, end }] }).
-  // 3. Put the audio somewhere public (e.g. frontend/sample-take.m4a next to this file, or a public
-  //    Cloud Storage object) and set SAMPLE_AUDIO_URL to it.
-  // Until then the example uses SAMPLE_READING below with made-up timings, and playback is off.
-  const SAMPLE_AUDIO_URL = '';
-  const SAMPLE_TRANSCRIPT = null;
-
-  // ---------- Built-in scripts (written to be read aloud: no dashes, no brackets) ----------
-  const STYLES = [
-    { id: 'tip', label: 'Quick tip' },
-    { id: 'review', label: 'Honest review' },
-    { id: 'day', label: 'Day in my life' },
-    { id: 'story', label: 'Storytime' },
-  ];
-  const SCRIPTS = {
-    tip: [
-      { id: 'tip-1', text: "If your videos feel flat, try this before you change anything else. Watch the first three seconds with the sound off. Would you keep scrolling? Most people would, because the opening is a slow wave and a hello. Start with the most interesting thing you're going to say, and save the greeting for later, or cut it completely. New viewers don't care who you are yet. They care about why they should stay. Give them that reason first, and the rest of the video gets a fair chance." },
-      { id: 'tip-2', text: "Here's a lighting trick that costs nothing. Turn off the big light in the middle of the room and sit facing a window instead. Not beside it, facing it. Daylight evens out your skin and puts a little shine in your eyes, which makes you look awake even when you're not. If the window is behind you, you'll turn into a silhouette, so move the desk if you have to. Try it once and compare the two clips side by side. I don't think you'll go back." },
-      { id: 'tip-3', text: "Stop putting every word you say on screen. If the captions match your voice exactly, people read ahead and then get bored waiting for you to catch up. Use text for the one line you want them to remember, or for a number that's easy to miss. Let your voice carry the rest. It feels strange at first, because captions seem like a safety net. But a cleaner screen makes you look more confident, and people listen more closely when they're not racing you." },
+  // ---------- Example report ----------
+  // A real take (frontend/sample-take.m4a), run through the live backend with the
+  // "Pick one concept from your niche and explain it." prompt.
+  // BACKEND: to swap in a different example, upload the new recording the normal way, paste the JSON
+  // from POST /api/recordings/:id/transcript into SAMPLE_TRANSCRIPT and the JSON from
+  // POST /api/recordings/:id/analysis (sent with the same promptId) into SAMPLE_ANALYSIS, and replace
+  // frontend/sample-take.m4a. The server serves that file at /sample-take.m4a (see server.js).
+  const SAMPLE_AUDIO_URL = 'sample-take.m4a';
+  const SAMPLE_PROMPT = { id: 'pick-one-concept-from-your', text: 'Pick one concept from your niche and explain it.' };
+  const SAMPLE_TRANSCRIPT = {"text":"In browsers, the same origin policy is sort of like a defense mechanism that is used more or less to protect users from malicious attackers. So when you have a user and he goes into a website, other websites cannot fetch content from other origins without, um, getting explicit access from those other websites. So it serves to protect users, but it is also a way to restrict access to your website's contents to other websites that you may not want to share them with.","duration":35.748,"words":[{"word":"In","start":0.38,"end":0.5},{"word":"browsers,","start":0.56,"end":1.16},{"word":"the","start":1.38,"end":1.52},{"word":"same","start":1.66,"end":1.92},{"word":"origin","start":2.06,"end":2.38},{"word":"policy","start":2.5,"end":3},{"word":"is","start":3.18,"end":3.34},{"word":"sort","start":3.54,"end":3.68},{"word":"of","start":3.72,"end":3.78},{"word":"like","start":3.82,"end":3.94},{"word":"a","start":4.019,"end":4.12},{"word":"defense","start":4.28,"end":4.76},{"word":"mechanism","start":4.86,"end":5.5},{"word":"that","start":5.94,"end":6.02},{"word":"is","start":6.08,"end":6.3},{"word":"used","start":6.88,"end":7.18},{"word":"more","start":7.24,"end":7.38},{"word":"or","start":7.4,"end":7.4},{"word":"less","start":7.42,"end":7.56},{"word":"to","start":7.6,"end":7.68},{"word":"protect","start":7.7,"end":8.14},{"word":"users","start":8.3,"end":8.78},{"word":"from","start":9.18,"end":9.32},{"word":"malicious","start":9.36,"end":9.74},{"word":"attackers.","start":9.8,"end":10.44},{"word":"So","start":10.92,"end":11.1},{"word":"when","start":11.22,"end":11.32},{"word":"you","start":11.36,"end":11.46},{"word":"have","start":11.52,"end":11.8},{"word":"a","start":11.92,"end":11.98},{"word":"user","start":12.04,"end":12.36},{"word":"and","start":12.82,"end":12.92},{"word":"he","start":12.94,"end":13.02},{"word":"goes","start":13.06,"end":13.18},{"word":"into","start":13.2,"end":13.38},{"word":"a","start":13.4,"end":13.44},{"word":"website,","start":13.48,"end":14.02},{"word":"other","start":14.6,"end":14.76},{"word":"websites","start":14.8,"end":15.24},{"word":"cannot","start":15.36,"end":15.7},{"word":"fetch","start":15.82,"end":16.12},{"word":"content","start":16.44,"end":17.02},{"word":"from","start":17.28,"end":17.7},{"word":"other","start":17.76,"end":17.94},{"word":"origins","start":18.02,"end":18.58},{"word":"without,","start":19.26,"end":19.94},{"word":"um,","start":20.78,"end":20.9},{"word":"getting","start":21,"end":21.2},{"word":"explicit","start":21.26,"end":21.72},{"word":"access","start":21.9,"end":22.38},{"word":"from","start":22.58,"end":22.74},{"word":"those","start":22.8,"end":23.06},{"word":"other","start":23.14,"end":23.34},{"word":"websites.","start":23.56,"end":24.14},{"word":"So","start":24.44,"end":24.64},{"word":"it","start":24.86,"end":24.98},{"word":"serves","start":25.02,"end":25.48},{"word":"to","start":25.54,"end":25.76},{"word":"protect","start":25.78,"end":26.14},{"word":"users,","start":26.22,"end":26.6},{"word":"but","start":27.12,"end":27.42},{"word":"it","start":27.86,"end":27.92},{"word":"is","start":27.96,"end":28.1},{"word":"also","start":28.18,"end":28.56},{"word":"a","start":28.64,"end":28.68},{"word":"way","start":28.72,"end":29.02},{"word":"to","start":29.08,"end":29.22},{"word":"restrict","start":29.26,"end":29.66},{"word":"access","start":29.8,"end":30.26},{"word":"to","start":30.34,"end":30.42},{"word":"your","start":30.48,"end":30.56},{"word":"website's","start":30.6,"end":31},{"word":"contents","start":31.04,"end":31.56},{"word":"to","start":32.14,"end":32.36},{"word":"other","start":32.82,"end":33.1},{"word":"websites","start":33.42,"end":33.74},{"word":"that","start":33.78,"end":33.88},{"word":"you","start":33.9,"end":33.98},{"word":"may","start":34.02,"end":34.12},{"word":"not","start":34.18,"end":34.34},{"word":"want","start":34.48,"end":34.66},{"word":"to","start":34.7,"end":34.8},{"word":"share","start":34.84,"end":35},{"word":"them","start":35.06,"end":35.18},{"word":"with.","start":35.22,"end":35.42}]};
+  const SAMPLE_ANALYSIS = {
+    "promptId": "pick-one-concept-from-your",
+    "summary": "You answered the prompt directly and explained the same origin policy in a way that stays on topic. Your delivery is steady at 143 words per minute with no long pauses, which is a solid base. Tighten the opening, define your key terms, and end on a clear sentence so the next take is as sharp as this one.",
+    "strengths": [
+      "You stayed on the assigned concept from start to finish and explained what the policy restricts, not just what it is called.",
+      "Your second sentence gives a concrete mechanism (one site fetching content from another origin) that makes the idea easier to picture.",
+      "Your pacing is even at 143 words per minute with no long pauses, so the explanation is easy to follow."
     ],
-    review: [
-      { id: 'review-1', text: "I've been using these earbuds for three weeks, so here's the honest version. The sound is great for the price, and the case fits in a jeans pocket, which matters more than I expected. The box claims eight hours of battery. I get about six, which is still fine for a commute and a gym session. The one thing I'd change is the touch controls. I pause my music every time I fix my hair. Would I buy them again? Yes, but I'd turn the touch controls off on day one." },
-      { id: 'review-2', text: "This is the cheapest coffee grinder I could find, and I wanted to know if it was worth it. Short answer: mostly. It's loud, and it takes about a minute to grind enough for one cup, so it's not for busy mornings. But the coffee tastes noticeably better than the bag of ground coffee I was using before. If you only drink one cup a day and you don't mind the noise, it's a good place to start. If you're making coffee for a whole house, save up for something better." },
-      { id: 'review-3', text: "I bought this standing desk in January, and I've used it nearly every day since. Setting it up took about an hour and one argument with the instructions. The motor is quiet, the height presets are handy, and it doesn't wobble at full height, which was my biggest worry. The downside is the price. It's not cheap, and you can get something decent for half as much. But if you work from home and your back is already complaining, it's one of the better things you can spend money on." },
+    "topPriorities": [
+      "Open with a plain, confident one-sentence definition instead of hedged phrasing like 'sort of like' or 'more or less'.",
+      "Define any technical term, such as 'origin', the first time you use it.",
+      "End with one clear takeaway sentence instead of trailing off with a dangling word."
     ],
-    day: [
-      { id: 'day-1', text: "Today started at half six, which is early for me, because I had a nine o'clock lecture across town. I made porridge, missed the first bus, and caught the second one with about four minutes to spare. The lecture was on statistics, and honestly, it was better than I expected. After that I spent the afternoon in the library trying to finish an assignment that's due on Friday. I got about halfway. Tonight is pasta, one episode of something, and an early night. Tomorrow I'll tell you if the assignment survived." },
-      { id: 'day-2', text: "Sunday is my reset day, so here's what that actually looks like. I start with a slow breakfast and no phone for the first hour, which is harder than it sounds. Then I clean the kitchen, do one load of washing, and plan my meals for the week on the back of an envelope. In the afternoon I go for a long walk, usually by the sea if the weather is half decent. By the evening I feel like a person again. It's not glamorous, but it makes Monday a lot easier." },
-      { id: 'day-3', text: "This is a work from home day, so set your expectations low. I was at my desk by nine, which in my house means the kitchen table. The morning was emails and one long call that could have been a message. At lunch I walked to the shop just to see daylight. The afternoon was better. I finally finished the project I've been putting off for two weeks, and it took about forty minutes. Why do I always do that? Anyway, dinner is leftovers, and I'm calling that a win." },
+    "feedback": [
+      {
+        "category": "opening",
+        "quote": "sort of like",
+        "start": 3.54,
+        "end": 3.94,
+        "issue": "The first sentence hedges twice ('sort of like', 'more or less') before getting to the point, so viewers get no clear reason to keep watching.",
+        "tryInstead": "Start with a confident hook: 'The same origin policy stops one website from reading another website's data in your browser.'",
+        "alternatives": []
+      },
+      {
+        "category": "clarity",
+        "quote": "from other origins",
+        "start": 17.28,
+        "end": 18.58,
+        "issue": "'Origins' is used as if viewers already know what it means. You never say what makes two origins different.",
+        "tryInstead": "Say what an origin is before using the word: 'from other origins, meaning a different domain, protocol, or port.'",
+        "alternatives": []
+      },
+      {
+        "category": "filler",
+        "quote": "um,",
+        "start": 20.78,
+        "end": 20.9,
+        "issue": "You pause for about 0.84 seconds before 'um', so the hesitation breaks the flow right in the middle of the key rule.",
+        "tryInstead": "Pause silently for a beat, then restate the rule cleanly: 'without getting explicit access from those websites.'",
+        "alternatives": []
+      },
+      {
+        "category": "repetition",
+        "quote": "other websites",
+        "start": 14.6,
+        "end": 15.24,
+        "issue": "'Other websites' and 'other' show up four times and 'websites' three times, which makes the explanation feel repetitive and blurs who is doing what.",
+        "tryInstead": "Name the parties clearly and vary the wording: 'third-party sites cannot pull content from your origin without permission.'",
+        "alternatives": [
+          "third-party sites",
+          "outside domains",
+          "external sites"
+        ]
+      },
+      {
+        "category": "clarity",
+        "quote": "when you have a user and he goes into a website,",
+        "start": 11.22,
+        "end": 14.02,
+        "issue": "You switch from 'you' to 'a user' to 'he' in one clause, which makes the example confusing to follow.",
+        "tryInstead": "Keep one consistent subject: 'When a user visits your site, other sites cannot fetch its content without permission.'",
+        "alternatives": []
+      },
+      {
+        "category": "filler",
+        "quote": "So it serves",
+        "start": 24.44,
+        "end": 25.48,
+        "issue": "'So' opens two of your three sentences, which becomes a habit that makes the delivery sound like it is rambling.",
+        "tryInstead": "Drop the 'So' and start with the point: 'This policy protects users, and it also limits who can access your site's content.'",
+        "alternatives": []
+      },
+      {
+        "category": "ending",
+        "quote": "to share them with.",
+        "start": 34.7,
+        "end": 35.42,
+        "issue": "The take ends on a dangling preposition with no clear takeaway, so it fizzles out instead of landing.",
+        "tryInstead": "End with a clear conclusion: 'So it protects users and gives you control over who can read your site's content.'",
+        "alternatives": []
+      }
     ],
-    story: [
-      { id: 'story-1', text: "The first video I ever posted got eleven views, and I'm fairly sure four of them were my mum. I'd spent two whole days editing it. I added music, transitions, captions, the lot. Looking back, the problem wasn't the editing. I never said why anyone should care. Nobody wants to watch a stranger make toast for three minutes. These days I plan the first sentence before I touch the camera. If I can't say why it matters in one line, I don't film it. That one rule changed more than any app I've tried." },
-      { id: 'story-2', text: "Last summer I got lost in Lisbon with a dead phone and no idea where my hostel was. I walked for an hour, trying to look like I knew where I was going. Eventually I gave up and asked an old man sitting outside a café. He didn't speak much English, but he drew me a map on a napkin, and it was perfect. I still have that napkin. It's on my fridge. It reminds me that asking for help is usually faster than pretending you don't need it." },
-      { id: 'story-3', text: "When I was twelve, I entered a school talent show with a magic trick I'd learned the night before. It went badly. The card fell out of my sleeve in front of the whole school, and there was a long, painful silence. Then my best friend started clapping, really slowly, and everyone laughed, including me. I took a bow like it was part of the act. I didn't win, but I learned something useful. If something goes wrong in front of people, owning it is almost always better than hiding it." },
-    ],
+    "stats": {
+      "durationSeconds": 35.7,
+      "wordCount": 85,
+      "wordsPerMinute": 143,
+      "fillers": {
+        "total": 1,
+        "perMinute": 1.7,
+        "byWord": [
+          {
+            "word": "um",
+            "count": 1,
+            "moments": [
+              {
+                "start": 20.78,
+                "end": 20.9
+              }
+            ]
+          }
+        ]
+      },
+      "longPauses": [],
+      "repeatedWords": [
+        {
+          "word": "other",
+          "count": 4,
+          "moments": [
+            {
+              "start": 14.6,
+              "end": 14.76
+            },
+            {
+              "start": 17.76,
+              "end": 17.94
+            },
+            {
+              "start": 23.14,
+              "end": 23.34
+            },
+            {
+              "start": 32.82,
+              "end": 33.1
+            }
+          ]
+        },
+        {
+          "word": "websites",
+          "count": 3,
+          "moments": [
+            {
+              "start": 14.8,
+              "end": 15.24
+            },
+            {
+              "start": 23.56,
+              "end": 24.14
+            },
+            {
+              "start": 33.42,
+              "end": 33.74
+            }
+          ]
+        }
+      ],
+      "sentenceOpeners": [
+        {
+          "opener": "so",
+          "count": 2
+        }
+      ],
+      "sentenceCount": 3
+    },
+    "model": "anthropic/claude-haiku-5.5"
   };
-  const SAMPLE_SCRIPT = SCRIPTS.tip[0];
-  // What the example speaker "said" when reading SAMPLE_SCRIPT. "||" marks a long pause.
-  const SAMPLE_READING = "So, um, if your videos feel flat, try this before you change anything else. Watch the first three seconds with the sound off. "
-    + "Would you keep scrolling? Most people would, because the opening is, like, a slow wave and a hello. || Start with the most interesting thing "
-    + "you're gonna say, and save the greeting for later, or cut it. New viewers don't care who you are. They care about, um, why they should stay. "
-    + "Give them that reason first, and the rest of the video gets a real chance.";
 
-  const READING_WPM = 150; // used to estimate how long a script takes out loud
+  // ---------- Labels for the analysis categories ----------
+  const CATEGORIES = {
+    filler: { title: 'Filler words', short: 'filler words' },
+    repetition: { title: 'Repeated words', short: 'repetition' },
+    opening: { title: 'Your opening', short: 'your opening' },
+    clarity: { title: 'Clarity', short: 'clarity' },
+    structure: { title: 'Structure', short: 'structure' },
+    pacing: { title: 'Pacing', short: 'pacing' },
+    ending: { title: 'Your ending', short: 'your ending' },
+  };
+  const categoryTitle = (cat) => CATEGORIES[cat]?.title || cat;
+  const categoryShort = (cat) => CATEGORIES[cat]?.short || cat;
 
-  async function fetchScript(style, previousId) {
-    if (USE_SCRIPT_API) {
-      try {
-        const s = await api('/api/scripts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ style, previousId }),
-        });
-        if (s?.text) return { id: s.id, style, text: s.text.trim() };
-      } catch { /* fall back to a built-in script */ }
-    }
-    const pool = SCRIPTS[style].filter((s) => s.id !== previousId);
-    return { ...pool[Math.floor(Math.random() * pool.length)], style };
-  }
-
-  // ---------- Browser storage (per-browser free use, plan and current script) ----------
+  // ---------- Browser storage (per-browser free use, plan and chosen prompt) ----------
   const store = {
     get(key, fallback = null) {
       try { const v = localStorage.getItem(`outspoken.${key}`); return v === null ? fallback : JSON.parse(v); } catch { return fallback; }
@@ -465,177 +686,21 @@
     return data;
   }
 
-  // ---------- Words ----------
-  const FILLERS = new Set(['um', 'umm', 'uh', 'uhh', 'uhm', 'erm', 'er', 'ah', 'hmm', 'basically', 'literally', 'actually']);
-  const FILLER_PAIRS = new Set(['you know', 'i mean', 'kind of', 'sort of']);
-  const NUMBERS = 'zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty'.split(' ');
-  const LONG_PAUSE_SECONDS = 2.5;
+  const LONG_PAUSE_SECONDS = 1.5; // same threshold as the backend's stats
 
-  // "Café," -> "cafe", "6" -> "six", "Don’t" -> "don't"
-  function norm(word) {
-    const w = word.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’‘]/g, "'")
-      .replace(/[^a-z0-9'-]/g, '').replace(/^['-]+|['-]+$/g, '');
-    return /^\d+$/.test(w) && +w <= 20 ? NUMBERS[+w] : w;
-  }
-
-  // Spoken forms we treat as the same as the written ones ("gonna" = "going to", "you are" = "you're")
-  const SAME_SOUNDS = [
-    [/\bgonna\b/g, 'going to'], [/\bwanna\b/g, 'want to'], [/\bgotta\b/g, 'got to'], [/\bcan't\b/g, 'can not'], [/\bcannot\b/g, 'can not'],
-    [/\bwon't\b/g, 'will not'], [/n't\b/g, ' not'], [/'re\b/g, ' are'], [/'ll\b/g, ' will'], [/'ve\b/g, ' have'], [/'m\b/g, ' am'],
-    [/\bokay\b/g, 'ok'], [/-/g, ' '],
-  ];
-  function expand(text) {
-    let s = text.split(/\s+/).map(norm).join(' ');
-    for (const [re, to] of SAME_SOUNDS) s = s.replace(re, to);
-    return s.replace(/\s+/g, ' ').trim();
-  }
-
-  const plural = (n, word) => (n === 1 ? `one ${word}` : `${n} ${word}s`);
-
-  // Backend transcript -> words with filler and pause flags
-  function analyseTranscript(transcript) {
-    const words = transcript.words
-      .map((w) => ({ text: w.word, start: w.start, end: w.end, norm: norm(w.word), filler: '', pause: 0 }))
-      .filter((w) => w.norm);
-    words.forEach((w, i) => {
-      const prev = words[i - 1], next = words[i + 1];
-      if (FILLERS.has(w.norm)) w.filler = w.norm;
-      // "like" only counts as filler when set off by commas ("it's, like, great"), not "I like it"
-      if (w.norm === 'like' && (/,$/.test(w.text) || /,$/.test(prev?.text || ''))) w.filler = 'like';
-      const pair = next && `${w.norm} ${next.norm}`;
-      if (!w.filler && FILLER_PAIRS.has(pair)) { w.filler = pair; next.filler = pair; next.pairTail = true; }
-      if (prev) w.pause = Math.max(0, w.start - prev.end);
-    });
-    const duration = transcript.duration || words[words.length - 1]?.end || 1;
-    return { words, duration };
-  }
-
-  // ---------- Script vs. what was said ----------
-  // Lines the two up word by word (longest common subsequence), then reads the gaps:
-  // script words with nothing said = skipped, said words not in the script = added, both = swapped.
-  function compareToScript(scriptText, said) {
-    const expected = scriptText.split(/\s+/).map((text) => ({ text, norm: norm(text) })).filter((w) => w.norm);
-    const n = expected.length, m = said.length;
-    const L = new Uint16Array((n + 1) * (m + 1));
-    const at = (i, j) => i * (m + 1) + j;
-    for (let i = n - 1; i >= 0; i--) {
-      for (let j = m - 1; j >= 0; j--) {
-        L[at(i, j)] = expected[i].norm === said[j].norm ? L[at(i + 1, j + 1)] + 1 : Math.max(L[at(i + 1, j)], L[at(i, j + 1)]);
-      }
-    }
-
-    const c = { items: [], total: n, matched: 0, skippedWords: 0, skips: [], swaps: [], addedWords: 0, addedFillers: 0, fillerCounts: {}, openedWith: '', unread: 0 };
-    let skipRun = [], addRun = [], lastTime = 0;
-
-    const addWords = (run) => {
-      if (!run.length) return;
-      c.items.push({ type: 'added', text: run.map((s) => s.text).join(' '), start: run[0].start });
-      c.addedWords += run.length;
-      run.filter((s) => s.filler && !s.pairTail).forEach((s) => { c.fillerCounts[s.filler] = (c.fillerCounts[s.filler] || 0) + 1; });
-      c.addedFillers += run.filter((s) => s.filler && !s.pairTail).length;
+  function makeSampleReport() {
+    return {
+      prompt: SAMPLE_PROMPT,
+      transcript: SAMPLE_TRANSCRIPT,
+      analysis: SAMPLE_ANALYSIS,
+      // Replaced with bars from the real audio once it loads (loadSampleAudio)
+      peaks: peaksFromWords(SAMPLE_TRANSCRIPT.words, SAMPLE_TRANSCRIPT.duration),
+      audioUrl: SAMPLE_AUDIO_URL,
     };
-    const flush = (atEnd) => {
-      const expectedText = skipRun.map((e) => e.text).join(' ');
-      const saidText = addRun.map((s) => s.text).join(' ');
-      const core = addRun.filter((s) => !s.filler);
-      if (skipRun.length && addRun.length && expand(expectedText) === expand(saidText)) {
-        // Same words, said a different way ("gonna" for "going to"): counts as read
-        skipRun.forEach((e) => c.items.push({ type: 'ok', text: e.text, start: addRun[0].start }));
-        c.matched += skipRun.length;
-      } else if (skipRun.length && core.length) {
-        addWords(addRun.filter((s) => s.filler));
-        const swap = { type: 'swap', expected: expectedText, said: core.map((s) => s.text).join(' '), start: core[0].start };
-        c.items.push(swap);
-        c.swaps.push(swap);
-      } else {
-        addWords(addRun);
-        if (atEnd && skipRun.length >= 6) {
-          // Stopped before the end rather than skipping
-          skipRun.forEach((e) => c.items.push({ type: 'unread', text: e.text }));
-          c.unread = skipRun.length;
-        } else if (skipRun.length) {
-          skipRun.forEach((e) => c.items.push({ type: 'skipped', text: e.text }));
-          c.skippedWords += skipRun.length;
-          c.skips.push({ text: expectedText.replace(/[.,!?;:]+$/, ''), at: lastTime });
-        }
-      }
-      skipRun = []; addRun = [];
-    };
-
-    let i = 0, j = 0;
-    while (i < n || j < m) {
-      if (i < n && j < m && expected[i].norm === said[j].norm) {
-        flush(false);
-        c.items.push({ type: 'ok', text: expected[i].text, start: said[j].start });
-        c.matched++;
-        lastTime = said[j].end;
-        i++; j++;
-      } else if (j < m && (i === n || L[at(i, j + 1)] >= L[at(i + 1, j)])) {
-        addRun.push(said[j++]);
-      } else {
-        skipRun.push(expected[i++]);
-      }
-    }
-    flush(true);
-
-    if (c.items[0]?.type === 'added') c.openedWith = c.items[0].text.replace(/[.,!?;:]+$/, '');
-    c.pct = n ? Math.round((c.matched / n) * 100) : 0;
-    c.topFiller = Object.entries(c.fillerCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
-    return c;
   }
 
-  // ---------- Report ----------
-  function buildReport(transcript, scriptText) {
-    const { words, duration } = analyseTranscript(transcript);
-    const comparison = compareToScript(scriptText, words);
-    const minutes = Math.max(duration / 60, 1 / 60);
-    const longest = words.filter((w) => w.pause >= LONG_PAUSE_SECONDS).sort((a, b) => b.pause - a.pause)[0];
-    const stats = {
-      pace: Math.round(words.length / minutes),
-      fillersPerMin: +(comparison.addedFillers / minutes).toFixed(1),
-      longestPause: longest ? { seconds: longest.pause, at: longest.start - longest.pause } : null,
-      scriptSeconds: Math.round((comparison.total / READING_WPM) * 60),
-      wordCount: words.length,
-    };
-    return { words, duration, comparison, stats, summary: buildSummary(stats, comparison, duration) };
-  }
-
-  // One paragraph of coaching, most useful points first
-  function buildSummary(stats, c, duration) {
-    const parts = [];
-    if (stats.wordCount < 15) parts.push("This take is very short, so there isn't much to go on yet.");
-    if (c.unread) parts.push(`You stopped about ${c.unread} words short of the end, so this only covers the part you read. Next time, keep going to the last line even if you stumble.`);
-    if (c.pct >= 97 && !c.addedWords) parts.push('You read the script almost exactly as written, which is harder than it sounds.');
-    else parts.push(`You read ${c.pct}% of the script word for word.`);
-    if (c.openedWith) parts.push(`You started with "${c.openedWith}" before the first line. Go straight in: the opening line is the hook, and it works best said first.`);
-    if (c.skips.length) {
-      const s = c.skips[0];
-      parts.push(c.skippedWords === 1
-        ? `You dropped "${s.text}" at ${fmtTime(s.at)}. That usually means your eyes were running ahead of your voice, so give each line a beat.`
-        : `You dropped ${plural(c.skippedWords, 'word')}, starting with "${s.text}" at ${fmtTime(s.at)}. That usually means your eyes were running ahead of your voice, so give each line a beat.`);
-    }
-    if (c.swaps.length) {
-      const s = c.swaps[0];
-      const more = c.swaps.length > 1 ? `, and changed ${plural(c.swaps.length - 1, 'other bit')} too` : '';
-      parts.push(`At ${fmtTime(s.start)} you said "${s.said.replace(/[.,!?;:]+$/, '')}" instead of "${s.expected.replace(/[.,!?;:]+$/, '')}"${more}. Small swaps are fine if they sound more like you, as long as the meaning stays the same.`);
-    }
-    if (c.addedFillers) {
-      parts.push(`You added ${plural(c.addedFillers, 'filler')}, mostly "${c.topFiller}". With the words right in front of you, that's habit rather than hesitation, so try a short silent pause where you'd normally say it.`);
-    }
-    if (duration >= 10) {
-      const note = stats.pace > 175 ? 'which is quick. Ease off a touch so the important lines have room to land'
-        : stats.pace < 120 ? "which is on the slow side. Let the sentences run together a little more, like you're talking to a friend"
-        : 'a comfortable pace to listen to';
-      parts.push(`You read at about ${stats.pace} words a minute, ${note}.`);
-    }
-    if (stats.longestPause) {
-      parts.push(`There's a ${stats.longestPause.seconds.toFixed(1)}-second gap at ${fmtTime(stats.longestPause.at)}. If you lost your place, that's normal; just trim it when you edit.`);
-    }
-    if (c.pct >= 97 && !c.addedFillers && !stats.longestPause) parts.push('A clean read. Try a different style next and see if it holds up.');
-    return parts.join(' ');
-  }
-
-  // Waveform bars (0..1) from the recording itself
+  // ---------- Waveforms ----------
+  // Bars (0..1) from the recording itself
   async function peaksFromAudio(blob, bars = 72) {
     const ctx = new AudioContext();
     try {
@@ -654,7 +719,7 @@
     }
   }
 
-  // Fallback waveform from word timings (example report, or audio the browser cannot decode)
+  // Fallback bars from word timings (example report, or audio the browser cannot decode)
   function peaksFromWords(words, duration, bars = 72) {
     return Array.from({ length: bars }, (_, i) => {
       const t = ((i + 0.5) / bars) * duration;
@@ -668,50 +733,60 @@
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   }
 
-  // Text -> transcript in the backend's shape, with made-up timings. "||" marks a long pause.
-  function fakeTranscript(text) {
-    let t = 0.3;
-    const words = [];
-    text.split(/\s+/).forEach((token) => {
-      if (token === '||') { t += 2.8; return; }
-      const length = 0.16 + token.length * 0.03;
-      words.push({ word: token, start: +t.toFixed(2), end: +(t + length).toFixed(2) });
-      t += length + 0.07;
-    });
-    return { text: text.replace(/\|\|\s*/g, ''), words, duration: +t.toFixed(2) };
-  }
+  // ---------- Components ----------
+  const NoteCard = {
+    template: '#note-tpl',
+    props: { note: Object, n: Number, label: String, canSeek: Boolean },
+    emits: ['seek'],
+    methods: { fmtTime },
+  };
 
-  function makeSampleReport() {
-    const report = buildReport(SAMPLE_TRANSCRIPT || fakeTranscript(SAMPLE_READING), SAMPLE_SCRIPT.text);
-    return {
-      ...report,
-      peaks: peaksFromWords(report.words, report.duration),
-      audioUrl: SAMPLE_AUDIO_URL,
-      noAudioNote: "The example recording hasn't been added yet, so there's nothing to play. Everything else is exactly what you'd see for your own take.",
-    };
-  }
-
-  // ---------- Report component ----------
   const ReportView = {
     template: '#report-tpl',
-    props: { report: { type: Object, required: true } },
-    data: () => ({ playing: false, playTime: 0 }),
+    props: { report: { type: Object, required: true }, next: Object },
+    emits: ['use-prompt'],
+    data: () => ({ playing: false, playTime: 0, audioFailed: false }),
     computed: {
-      c() { return this.report.comparison; },
-      seekable() { return this.report.audioUrl ? 'cursor-pointer rounded hover:bg-mint/50' : ''; },
+      a() { return this.report.analysis; },
+      s() { return this.report.analysis.stats; },
+      duration() { return this.report.transcript.duration || this.s.durationSeconds; },
+      seekClass() { return this.canPlay ? 'cursor-pointer hover:brightness-95' : ''; },
+      maxFiller() { return Math.max(1, ...this.s.fillers.byWord.map((f) => f.count)); },
+      numbered() { return this.a.feedback.map((note, i) => ({ note, n: i + 1, label: categoryTitle(note.category) })); },
+      canPlay() { return !!this.report.audioUrl && !this.audioFailed; },
+      // Transcript split into plain text, coaching notes, fillers and long pauses
+      segments() {
+        const words = this.report.transcript.words;
+        const notes = this.a.feedback;
+        const fillers = this.s.fillers.byWord.flatMap((f) => f.moments);
+        const within = (w, m) => m.start != null && w.start >= m.start - 0.01 && w.end <= m.end + 0.01;
+        const segs = [];
+        words.forEach((w, i) => {
+          const gap = i ? w.start - words[i - 1].end : 0;
+          if (gap >= LONG_PAUSE_SECONDS) segs.push({ type: 'pause', text: `${gap.toFixed(1)}s pause` });
+          const noteIndex = notes.findIndex((m) => within(w, m));
+          const type = noteIndex >= 0 ? 'note' : fillers.some((m) => within(w, m)) ? 'filler' : 'plain';
+          const n = noteIndex + 1;
+          const last = segs[segs.length - 1];
+          if (last && last.type === type && (type !== 'note' || last.n === n)) last.text += ` ${w.word}`;
+          else segs.push({ type, n, text: w.word, start: w.start });
+        });
+        return segs;
+      },
       tiles() {
-        const s = this.report.stats, c = this.c;
-        const pace = s.pace > 175 ? 'a little quick' : s.pace < 120 ? 'a little slow' : 'comfortable';
+        const s = this.s, wpm = s.wordsPerMinute, d = this.duration;
+        const pace = wpm > 180 ? 'a little quick' : wpm < 120 ? 'a little slow' : 'comfortable to follow';
         return [
-          { label: 'Read as written', value: `${c.pct}%`, note: c.unread ? 'You stopped before the end' : c.pct >= 95 ? 'Very close to the script' : c.pct >= 85 ? 'A few slips' : 'Room to tighten up' },
-          { label: 'Pace', value: this.report.duration >= 10 ? s.pace : '–', note: `words a minute, ${pace}` },
-          { label: 'Fillers added', value: c.addedFillers, note: c.addedFillers ? `${s.fillersPerMin} a minute` : 'None. Nicely done.' },
-          { label: 'Length', value: fmtTime(this.report.duration), note: `The script takes about ${fmtTime(s.scriptSeconds)}` },
+          { label: 'Pace', value: d >= 10 ? wpm : '–', note: `words a minute, ${pace}` },
+          { label: 'Filler words', value: s.fillers.total, note: s.fillers.total ? `${s.fillers.perMinute} a minute` : 'None. Nicely done.' },
+          { label: 'Long pauses', value: s.longPauses.length, note: s.longPauses.length ? 'Gaps of 1.5 seconds or more' : 'None. You kept it moving.' },
+          { label: 'Length', value: fmtTime(d), note: d < 30 ? 'Try for 30 seconds or more' : d > 150 ? 'Long for a short video' : 'A good length' },
         ];
       },
     },
     watch: {
-      report() {
+      report(next, prev) {
+        if (next.audioUrl !== prev?.audioUrl) this.audioFailed = false;
         this.$refs.player?.pause();
         this.playing = false;
         this.playTime = 0;
@@ -757,9 +832,9 @@
       },
       seekFromWave(e) {
         const player = this.$refs.player;
-        if (!player || !this.report.duration) return;
+        if (!player || !this.duration) return;
         const rect = e.currentTarget.getBoundingClientRect();
-        player.currentTime = ((e.clientX - rect.left) / rect.width) * (player.duration || this.report.duration);
+        player.currentTime = ((e.clientX - rect.left) / rect.width) * (player.duration || this.duration);
         this.playTime = player.currentTime;
         this.draw();
       },
@@ -770,10 +845,10 @@
         c.width = c.clientWidth * dpr;
         c.height = c.clientHeight * dpr;
         const ctx = c.getContext('2d');
-        const { peaks, duration } = this.report;
+        const { peaks } = this.report;
         const gap = 3 * dpr;
         const w = (c.width - gap * (peaks.length - 1)) / peaks.length;
-        const played = duration ? this.playTime / duration : 0;
+        const played = this.duration ? this.playTime / this.duration : 0;
         ctx.fillStyle = '#06B6D4';
         peaks.forEach((v, i) => {
           const h = Math.max(3 * dpr, v * c.height);
@@ -785,33 +860,39 @@
   };
 
   // ---------- App ----------
-  const savedScript = store.get('script');
+  const sample = makeSampleReport();
 
   const app = Vue.createApp({
     data() {
       return {
         navLinks: [
-          { href: '#studio', label: 'Script' },
+          { href: '#studio', label: 'Prompts' },
           { href: '#feedback', label: 'Feedback' },
           { href: '#example', label: 'Example' },
         ],
         steps: [
-          { title: 'Get a script', text: "Something short, written the way creators actually talk. Pick a style, or keep shuffling until one feels like you." },
-          { title: 'Read it out loud', text: "Read it once in your head, then record the whole thing. Don't perform it. Say it the way you'd say it to camera." },
-          { title: 'See what changed', text: 'We line your take up against the script, word by word, and tell you what to work on before you film for real.' },
+          { title: 'Pick a prompt', text: "Each one gives you something specific to talk about, so you're not staring at the camera wondering where to start." },
+          { title: "Talk, don't perform", text: "Record yourself answering it in one take. Stumbles are fine. They're exactly what we're listening for." },
+          { title: 'See what to change', text: 'Our AI coach listens back, points to the moments that need work, and suggests what to say instead.' },
         ],
         heroBars: Array.from({ length: 34 }, (_, i) => 22 + Math.round(72 * Math.abs(Math.sin(i * 1.3) * Math.cos(i * 0.37)))),
-        styles: STYLES,
+        heroStats: { pace: sample.analysis.stats.wordsPerMinute, fillers: sample.analysis.stats.fillers.total, notes: sample.analysis.feedback.length },
+        promptTips: [
+          'Say what you\'re talking about in your first sentence.',
+          'Stick to one main point, with one example that makes it real.',
+          'Finish on a clear takeaway, not "so yeah".',
+        ],
         plans: [
           { id: 'monthly', name: 'Monthly', price: '€15', per: '/month', note: 'Billed monthly after your trial' },
           { id: 'yearly', name: 'Yearly', price: '€150', per: '/year', note: '€12.50/month · save €30', badge: 'Best value' },
           // Temporary: skips Stripe and unlocks Pro locally, for testing
           { id: 'dev', name: 'Dev payment', price: '€0', per: '', note: 'Full access for testing, no checkout' },
         ],
-        perks: ['Unlimited analyses, every day', 'The full script comparison on every take', '7 days free, cancel any time'],
-        script: savedScript,
-        style: savedScript?.style || 'tip',
-        scriptLoading: false,
+        perks: ['Unlimited analyses, every day', 'The full report on every take', '7 days free, cancel any time'],
+        promptList: [],
+        promptsLoading: true,
+        promptsError: '',
+        promptId: store.get('promptId'),
         state: 'idle', // idle | recording | ready
         busy: '', // '' or the step being shown on the button
         error: '',
@@ -822,7 +903,7 @@
         audioUrl: '',
         audioName: '',
         report: null,
-        sampleReport: makeSampleReport(),
+        sampleReport: sample,
         freeDay: store.get('freeDay'),
         sub: store.get('sub'),
         paywall: { open: false, limitHit: false, plan: 'yearly', loading: false, error: '' },
@@ -833,49 +914,63 @@
       isPro() { return !!this.sub?.active; },
       freeLeft() { return this.freeDay !== today(); },
       selectedPlan() { return this.plans.find((p) => p.id === this.paywall.plan); },
+      selectedPrompt() { return this.promptList.find((p) => p.id === this.promptId) || null; },
       locked() { return this.state === 'recording' || !!this.busy; },
-      scriptWords() { return this.script ? this.script.text.split(/\s+/).length : 0; },
-      scriptSeconds() { return Math.round((this.scriptWords / READING_WPM) * 60); },
     },
     mounted() {
       requestAnimationFrame(() => this.drawIdleWave()); // after v-cloak lifts, so the canvas has a size
       window.addEventListener('resize', () => { if (this.state !== 'recording') this.drawIdleWave(); });
       window.addEventListener('keydown', (e) => { if (e.key === 'Escape') this.paywall.open = false; });
       this.handleCheckoutReturn();
+      this.loadPrompts();
       this.loadSampleAudio();
     },
     methods: {
       fmtTime,
-      styleLabel(id) { return STYLES.find((s) => s.id === id)?.label || 'Script'; },
 
-      // ---------- Script ----------
-      async newScript() {
-        if (this.locked || this.scriptLoading) return;
-        this.scriptLoading = true;
+      // ---------- Prompts ----------
+      async loadPrompts() {
+        this.promptsLoading = true;
+        this.promptsError = '';
         try {
-          const next = await fetchScript(this.style, this.script?.id);
-          if (this.audioBlob) {
-            this.clearTake();
-            this.notice = 'We cleared your last take, since it was for a different script.';
-          }
-          this.script = next;
-          store.set('script', next);
+          const { prompts } = await api('/api/prompts');
+          this.promptList = prompts;
+          const live = prompts.find((p) => p.id === SAMPLE_PROMPT.id);
+          if (live) this.sampleReport = { ...this.sampleReport, prompt: live };
+        } catch (err) {
+          this.promptsError = err.message;
         } finally {
-          this.scriptLoading = false;
+          this.promptsLoading = false;
         }
       },
-      pickStyle(id) {
-        this.style = id;
-        this.newScript();
+      choosePrompt(id) {
+        if (this.locked || id === this.promptId) return;
+        if (this.audioBlob) {
+          this.clearTake();
+          this.notice = 'We cleared your last take, since it was for a different prompt.';
+        }
+        this.promptId = id;
+        store.set('promptId', id);
       },
-      startFromHero() {
+      usePrompt(id) {
+        this.choosePrompt(id);
         this.scrollTo('studio');
-        if (!this.script) this.newScript();
+      },
+      // After a report: the next prompt in the list, plus the area most of the notes were about
+      nextPromptFor(report) {
+        const others = this.promptList.filter((p) => p.id !== report?.prompt.id);
+        if (!report || !others.length) return null;
+        const counts = {};
+        report.analysis.feedback.forEach((f) => { counts[f.category] = (counts[f.category] || 0) + 1; });
+        const top = Object.entries(counts).sort((x, y) => y[1] - x[1])[0];
+        if (!top) return null;
+        const after = this.promptList.findIndex((p) => p.id === report.prompt.id);
+        return { prompt: this.promptList[(after + 1) % this.promptList.length], area: categoryShort(top[0]) };
       },
 
       // ---------- Recording ----------
       async startRecording() {
-        if (!this.script) return;
+        if (!this.selectedPrompt) return;
         this.error = '';
         this.notice = '';
         let stream;
@@ -931,27 +1026,35 @@
         this.drawIdleWave();
       },
 
-      // ---------- Upload, transcribe, compare ----------
+      // ---------- Upload, transcribe, analyse ----------
       async getFeedback() {
         if (!this.isPro && !this.freeLeft) return this.openPaywall(true);
         this.error = '';
+        const prompt = this.selectedPrompt;
         try {
-          this.busy = 'Uploading…';
-          const recording = await this.uploadRecording(this.audioBlob, this.audioName);
+          // Reuse the upload when retrying the same take (e.g. after the analysis timed out)
+          if (this.lastUpload?.blob !== this.audioBlob) {
+            this.busy = 'Uploading…';
+            const recording = await this.uploadRecording(this.audioBlob, this.audioName);
+            this.lastUpload = { blob: this.audioBlob, id: recording.id };
+          }
+          const id = this.lastUpload.id;
           this.busy = 'Listening to your take…';
-          const transcript = await api(`/api/recordings/${recording.id}/transcript`, { method: 'POST' });
+          const transcript = await api(`/api/recordings/${id}/transcript`, { method: 'POST' });
+          this.busy = 'Writing your feedback…';
 
-          // BACKEND: everything in the report is worked out in this browser from the transcript
-          // (compareToScript, buildSummary). To have the written paragraph come from OpenRouter
-          // instead, call POST /api/recordings/${recording.id}/analysis here and send the script,
-          // e.g. body { script: this.script.text }, so the model can comment on the reading as well
-          // as the delivery. Then use its `summary` in place of report.summary below. Sending a body
-          // is a change to the API contract, so note it in docs/api.md for the frontend team.
-          const report = buildReport(transcript, this.script.text);
+          // Sending promptId lets the AI also say whether the take answered the prompt and stayed on it
+          // (see POST /api/recordings/:id/analysis in docs/api.md). Saved per recording and prompt, so
+          // retrying is instant.
+          const analysis = await api(`/api/recordings/${id}/analysis`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ promptId: prompt.id }),
+          });
 
           let peaks;
-          try { peaks = await peaksFromAudio(this.audioBlob); } catch { peaks = peaksFromWords(report.words, report.duration); }
-          this.report = { ...report, peaks, audioUrl: this.audioUrl };
+          try { peaks = await peaksFromAudio(this.audioBlob); } catch { peaks = peaksFromWords(transcript.words, transcript.duration); }
+          this.report = { prompt, transcript, analysis, peaks, audioUrl: this.audioUrl };
           if (!this.isPro) { this.freeDay = today(); store.set('freeDay', this.freeDay); }
           this.scrollTo('feedback');
         } catch (err) {
@@ -1077,6 +1180,7 @@
     },
   });
 
+  app.component('note-card', NoteCard);
   app.component('report-view', ReportView);
   app.mount('#app');
 </script>

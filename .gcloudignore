@@ -9,3 +9,4 @@ api-key
 stripe-key
 frontend/*
 !frontend/index.html
+!frontend/sample-take.m4a

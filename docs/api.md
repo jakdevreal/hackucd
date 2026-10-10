@@ -312,7 +312,7 @@ Checks a checkout from the `session_id` Stripe returned. Call it on return from 
 
 ## The website (GET /)
 
-`GET /` serves `frontend/index.html`, so the whole site runs at the base URL above, with no separate frontend hosting. A redeploy of the backend picks up the latest `frontend/index.html`. Only that one file is served; the rest of `frontend/` is not uploaded.
+`GET /` serves `frontend/index.html`, so the whole site runs at the base URL above, with no separate frontend hosting. A redeploy of the backend picks up the latest `frontend/index.html`. `GET /sample-take.m4a` serves the example recording the page plays (`frontend/sample-take.m4a`). Only those two files are served; the rest of `frontend/` is not uploaded.
 
 ## Dev test page
 

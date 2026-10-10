@@ -135,8 +135,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// The frontend team's single-page app, so the whole site runs from this one service
+// The frontend team's single-page app, and the example recording it plays, so the whole site runs from this one service
 app.get('/', (req, res) => res.sendFile(path.resolve('frontend/index.html')));
+app.get('/sample-take.m4a', (req, res) => res.sendFile(path.resolve('frontend/sample-take.m4a')));
 
 // Throwaway page for recording and uploading while the real frontend is built
 app.use('/dev', express.static('dev'));
