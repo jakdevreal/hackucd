@@ -66,6 +66,41 @@ Keep `id`: later endpoints (analysis) will take it.
 | 415 | `UNSUPPORTED_FORMAT` | Video file, or contents are not one of the formats above |
 | 502 | `STORAGE_FAILED` | Cloud Storage write failed; safe to retry |
 
+## POST /api/recordings/:id/transcript
+
+Transcribes a recording uploaded with `POST /api/recordings`, using its `id`. No request body. This can take several seconds (longer for long recordings, up to a 240 s limit), so show a loading state.
+
+The transcript is saved to Cloud Storage. Calling this again for the same recording returns the saved transcript instantly, without transcribing again. Retrying after an error is safe.
+
+**Response 200**
+
+```json
+{
+  "recordingId": "6c0089fd-ea31-4083-a2de-62e14fe66cc8",
+  "text": "Hey everyone, so today I want to talk about...",
+  "duration": 42.7,
+  "words": [
+    { "word": "Hey", "start": 0.12, "end": 0.34 },
+    { "word": "everyone,", "start": 0.36, "end": 0.81 }
+  ],
+  "model": "elevenlabs/scribe-v2",
+  "createdAt": "2026-10-10T11:30:00.000Z"
+}
+```
+
+`duration`, `start` and `end` are in seconds from the start of the recording. Use them to highlight words or jump the audio player to a moment.
+
+**Errors**
+
+| Status | `code` | When |
+| --- | --- | --- |
+| 404 | `RECORDING_NOT_FOUND` | No recording with that `id` |
+| 422 | `NO_SPEECH` | Recording has no detectable speech |
+| 422 | `UNREADABLE_AUDIO` | File could not be decoded; record again |
+| 502 | `TRANSCRIPTION_FAILED` | Transcription service error; safe to retry |
+| 502 | `STORAGE_FAILED` | Cloud Storage error; safe to retry |
+| 504 | `TRANSCRIPTION_TIMEOUT` | Took longer than 240 s; safe to retry |
+
 ## Dev test page
 
 `GET /dev/record.html` is a bare page for recording from the mic (or picking a file) and uploading it. It is for backend testing only, not part of the product.

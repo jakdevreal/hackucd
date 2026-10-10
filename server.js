@@ -1,4 +1,10 @@
+import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import express from 'express';
 import multer from 'multer';
 import { Storage } from '@google-cloud/storage';
@@ -7,6 +13,11 @@ const app = express();
 const PORT = process.env.PORT || 8080; // Cloud Run injects PORT
 const BUCKET = process.env.GCS_BUCKET || 'hackucd-storage';
 const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB) || 25;
+const TRANSCRIBE_TIMEOUT_SECONDS = Number(process.env.TRANSCRIBE_TIMEOUT_SECONDS) || 240;
+const TRANSCRIBE_SCRIPT = fileURLToPath(new URL('./transcribe_video.py', import.meta.url));
+const RECORDING_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+const execFileAsync = promisify(execFile);
 
 // Audio formats we accept, keyed by what the file's first bytes say it is.
 // We trust the bytes, not the browser's reported type: phones often send a blank
@@ -42,6 +53,32 @@ const upload = multer({
 
 function apiError(status, code, message) {
   return Object.assign(new Error(message), { status, code, expose: true });
+}
+
+// Runs transcribe_video.py (ffmpeg + OpenRouter) and returns its combined transcript.json
+async function runTranscription(audioPath, outputDir) {
+  if (!process.env.OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY is not set');
+  try {
+    await execFileAsync('python3', [TRANSCRIBE_SCRIPT, audioPath, '--output-dir', outputDir], {
+      timeout: TRANSCRIBE_TIMEOUT_SECONDS * 1000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+  } catch (err) {
+    if (err.killed) {
+      throw apiError(504, 'TRANSCRIPTION_TIMEOUT', 'Transcription took too long. Please try again.');
+    }
+    const detail = (err.stderr || err.message).trim();
+    console.error('Transcription failed:', detail);
+    // ffprobe/ffmpeg ran but could not decode the file
+    if (/\['ff(probe|mpeg)'.*returned non-zero exit status/.test(detail)) {
+      throw apiError(422, 'UNREADABLE_AUDIO', 'Could not read the audio in this recording. Try recording again.');
+    }
+    if (/OpenRouter/.test(detail)) {
+      throw apiError(502, 'TRANSCRIPTION_FAILED', 'The transcription service failed. Please try again.');
+    }
+    throw err; // ffmpeg/python missing or another server problem
+  }
+  return JSON.parse(await readFile(path.join(outputDir, 'transcript.json'), 'utf8'));
 }
 
 app.use(express.json());
@@ -96,6 +133,66 @@ app.post('/api/recordings', upload.single('audio'), async (req, res, next) => {
   });
 });
 
+app.post('/api/recordings/:id/transcript', async (req, res, next) => {
+  const { id } = req.params;
+  if (!RECORDING_ID.test(id)) return next(apiError(404, 'RECORDING_NOT_FOUND', 'No recording with that id.'));
+
+  const transcriptFile = bucket.file(`transcripts/${id}.json`);
+  let recordingFile;
+  try {
+    // Already transcribed: return the saved copy instead of paying for it again
+    const [exists] = await transcriptFile.exists();
+    if (exists) {
+      const [saved] = await transcriptFile.download();
+      return res.json(JSON.parse(saved));
+    }
+    [[recordingFile]] = await bucket.getFiles({ prefix: `recordings/${id}.` });
+  } catch (err) {
+    console.error('Cloud Storage read failed:', err.message);
+    return next(apiError(502, 'STORAGE_FAILED', 'Could not load the recording. Please try again.'));
+  }
+  if (!recordingFile) return next(apiError(404, 'RECORDING_NOT_FOUND', 'No recording with that id.'));
+
+  const workDir = await mkdtemp(path.join(tmpdir(), 'transcribe-'));
+  try {
+    const audioPath = path.join(workDir, path.basename(recordingFile.name));
+    try {
+      await recordingFile.download({ destination: audioPath });
+    } catch (err) {
+      console.error('Cloud Storage download failed:', err.message);
+      throw apiError(502, 'STORAGE_FAILED', 'Could not load the recording. Please try again.');
+    }
+
+    const result = await runTranscription(audioPath, path.join(workDir, 'out'));
+    const words = (result.words || [])
+      .filter((w) => (!w.type || w.type === 'word') && String(w.word ?? '').trim())
+      .map((w) => ({ word: String(w.word).trim(), start: w.start, end: w.end }));
+    if (!result.text?.trim() || !words.length) {
+      throw apiError(422, 'NO_SPEECH', 'No speech was found in this recording.');
+    }
+
+    const transcript = {
+      recordingId: id,
+      text: result.text.trim(),
+      duration: result.duration,
+      words,
+      model: result.model,
+      createdAt: new Date().toISOString(),
+    };
+    try {
+      await transcriptFile.save(JSON.stringify(transcript), { contentType: 'application/json', resumable: false });
+    } catch (err) {
+      // Still give the user their transcript; it just won't be cached
+      console.error('Saving transcript failed:', err.message);
+    }
+    res.json(transcript);
+  } catch (err) {
+    next(err);
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+  }
+});
+
 // Unknown routes
 app.use((req, res) => {
   res.status(404).json({ error: { code: 'NOT_FOUND', message: `No route for ${req.method} ${req.path}` } });
@@ -111,7 +208,9 @@ app.use((err, req, res, next) => {
   }
   if (!err.expose) console.error(err);
   res.status(err.status || 500).json({
-    error: { code: err.code || 'INTERNAL_ERROR', message: err.expose ? err.message : 'Something went wrong' },
+    error: err.expose
+      ? { code: err.code || 'BAD_REQUEST', message: err.message }
+      : { code: 'INTERNAL_ERROR', message: 'Something went wrong' },
   });
 });
 

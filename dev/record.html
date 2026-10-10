@@ -20,12 +20,12 @@
   <span id="timer"></span>
   <p><input type="file" id="file" accept="audio/*"></p>
   <audio id="player" controls hidden></audio>
-  <p><button id="upload" disabled>Upload</button></p>
+  <p><button id="upload" disabled>Upload</button><button id="transcribe" disabled>Transcribe</button></p>
   <pre id="out">No upload yet.</pre>
 
   <script>
     const $ = (id) => document.getElementById(id);
-    let recorder, chunks = [], blob, startedAt, tick;
+    let recorder, chunks = [], blob, startedAt, tick, recordingId;
 
     function setBlob(b) {
       blob = b;
@@ -69,7 +69,18 @@
       form.append('audio', blob, blob.name || 'recording.' + ext);
       $('out').textContent = 'Uploading…';
       const res = await fetch('/api/recordings', { method: 'POST', body: form });
-      $('out').textContent = res.status + '\n' + JSON.stringify(await res.json(), null, 2);
+      const data = await res.json();
+      $('out').textContent = res.status + '\n' + JSON.stringify(data, null, 2);
+      recordingId = data.id;
+      $('transcribe').disabled = !recordingId;
+    };
+
+    $('transcribe').onclick = async () => {
+      $('out').textContent = 'Transcribing…';
+      const started = Date.now();
+      const res = await fetch(`/api/recordings/${recordingId}/transcript`, { method: 'POST' });
+      const secs = ((Date.now() - started) / 1000).toFixed(1);
+      $('out').textContent = `${res.status} in ${secs}s\n` + JSON.stringify(await res.json(), null, 2);
     };
   </script>
 </body>
