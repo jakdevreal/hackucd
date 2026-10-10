@@ -142,7 +142,7 @@
       <h2 class="text-2xl font-bold">2. Your feedback</h2>
 
       <div v-if="!report" class="mt-6 rounded-2xl border border-dashed border-warm p-10 text-center text-stone-500">
-        Your report will appear here after you record a take.
+        Your feedback will appear here after you record a take.
       </div>
 
       <div v-else class="mt-6 space-y-6">
@@ -150,118 +150,30 @@
           This is a sample report. Record a take to get one for your own voice.
         </p>
 
-        <!-- Stats -->
-        <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div v-for="s in report.stats" :key="s.label" class="rounded-2xl border border-warm bg-white p-5">
-            <div class="text-sm text-stone-500">{{ s.label }}</div>
-            <div class="mt-1 text-3xl font-bold" :class="s.color">{{ s.value }}</div>
-            <div class="mt-1 text-xs text-stone-500">{{ s.note }}</div>
-          </div>
-        </div>
-
-        <!-- Transcript breakdown -->
-        <div class="rounded-2xl border border-warm bg-white p-5">
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <h3 class="font-semibold">Transcript breakdown</h3>
-            <div class="flex flex-wrap gap-3 text-xs text-stone-600">
-              <span><span class="rounded bg-amber-100 px-1.5 text-amber-900">um</span> filler</span>
-              <span><span class="underline decoration-accent decoration-2 underline-offset-4">really</span> repeated</span>
-              <span><span class="rounded bg-accent/10 px-1.5 text-cyan-800">⏸ 2.1s</span> long pause</span>
+        <!-- Box 1: play back the take -->
+        <div class="flex items-center gap-4 rounded-2xl border border-warm bg-white p-5 sm:gap-6 sm:p-8">
+          <button @click="togglePlay" :disabled="!report.audioUrl" :aria-label="playing ? 'Pause' : 'Play'"
+                  :title="report.audioUrl ? '' : 'The sample report has no audio'"
+                  class="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-primary text-white shadow-sm hover:bg-emerald-600 disabled:bg-warm disabled:text-stone-400">
+            <svg v-if="!playing" viewBox="0 0 24 24" class="ml-1 h-6 w-6" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            <svg v-else viewBox="0 0 24 24" class="h-6 w-6" fill="currentColor"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
+          </button>
+          <div class="min-w-0 flex-1">
+            <canvas ref="playback" @click="seekFromWave" class="h-20 w-full" :class="report.audioUrl ? 'cursor-pointer' : ''"></canvas>
+            <div class="mt-1 flex justify-between font-mono text-xs text-stone-500">
+              <span>{{ fmtTime(playTime) }}</span><span>{{ fmtTime(report.duration) }}</span>
             </div>
           </div>
-          <audio v-if="report.audioUrl" ref="player" :src="report.audioUrl" controls class="mt-4 w-full"></audio>
-          <p class="mt-1 text-xs text-stone-500" v-if="report.audioUrl">Tap any word to hear that moment.</p>
-          <p class="mt-4 max-h-80 overflow-y-auto rounded-xl bg-paper p-4 leading-8">
-            <template v-for="(w, i) in report.words" :key="i">
-              <span v-if="w.pause" class="mx-1 rounded bg-accent/10 px-1.5 py-0.5 text-xs text-cyan-800">⏸ {{ w.pause.toFixed(1) }}s</span>
-              <span @click="seek(w.start)" :title="fmtTime(w.start)"
-                    class="rounded px-0.5"
-                    :class="[w.filler ? 'bg-amber-100 text-amber-900' : '', w.repeated ? 'underline decoration-accent decoration-2 underline-offset-4' : '', report.audioUrl ? 'cursor-pointer hover:bg-mint/60' : '']">{{ w.text }}</span>{{ ' ' }}
-            </template>
-          </p>
+          <audio v-if="report.audioUrl" ref="player" :src="report.audioUrl" class="hidden"
+                 @play="onPlay" @pause="playing = false" @ended="onEnded"></audio>
         </div>
 
-        <!-- Fillers + repeated words -->
-        <div class="grid gap-4 md:grid-cols-2">
-          <div class="rounded-2xl border border-warm bg-white p-5">
-            <h3 class="font-semibold">Filler words and habits</h3>
-            <p v-if="!report.fillers.length" class="mt-4 rounded-lg bg-mint/40 px-3 py-2 text-sm text-emerald-900">No filler words found. Nice.</p>
-            <ul class="mt-4 space-y-3">
-              <li v-for="f in report.fillers" :key="f.word">
-                <div class="flex justify-between text-sm"><span>"{{ f.word }}"</span><span class="font-semibold">{{ f.count }}×</span></div>
-                <div class="mt-1 h-2 rounded-full bg-mint/60">
-                  <div class="h-2 rounded-full bg-primary" :style="{ width: (f.count / report.fillers[0].count * 100) + '%' }"></div>
-                </div>
-              </li>
-            </ul>
-          </div>
-          <div class="rounded-2xl border border-warm bg-white p-5">
-            <h3 class="font-semibold">Repeated words</h3>
-            <p v-if="!report.repeated.length" class="mt-4 rounded-lg bg-mint/40 px-3 py-2 text-sm text-emerald-900">Good variety. No word stood out as overused.</p>
-            <ul class="mt-4 divide-y divide-warm">
-              <li v-for="r in report.repeated" :key="r.word" class="py-2.5 text-sm">
-                <span class="font-semibold">"{{ r.word }}"</span> <span class="text-stone-500">used {{ r.count }}×</span>
-                <div class="mt-1 flex flex-wrap gap-1.5">
-                  <span class="text-stone-500">Try:</span>
-                  <span v-for="alt in r.alternatives" :key="alt" class="rounded-md bg-accent/10 px-2 py-0.5 text-cyan-800">{{ alt }}</span>
-                </div>
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        <!-- Moments -->
-        <div class="rounded-2xl border border-warm bg-white p-5">
-          <h3 class="font-semibold">Moments to fix</h3>
-          <p v-if="!report.moments.length" class="mt-4 rounded-lg bg-mint/40 px-3 py-2 text-sm text-emerald-900">Nothing major to fix in this take. Keep it up.</p>
-          <ul class="mt-4 space-y-4">
-            <li v-for="m in report.moments" :key="m.start + m.type" class="rounded-xl border border-warm p-4">
-              <div class="flex flex-wrap items-center gap-2 text-xs">
-                <button @click="seek(m.start)" class="rounded-md bg-stone-100 px-2 py-0.5 font-mono hover:bg-mint">{{ fmtTime(m.start) }}</button>
-                <span class="rounded-md px-2 py-0.5 font-semibold" :class="tagClass[m.type]">{{ m.type }}</span>
-              </div>
-              <blockquote class="mt-3 border-l-4 border-warm pl-3 italic text-stone-600">"{{ m.quote }}"</blockquote>
-              <p class="mt-3 text-sm">{{ m.issue }}</p>
-              <p class="mt-2 rounded-lg bg-mint/40 px-3 py-2 text-sm text-emerald-900"><span class="font-semibold">Try instead:</span> {{ m.fix }}</p>
-            </li>
-          </ul>
+        <!-- Box 2: written feedback -->
+        <div class="rounded-2xl border border-warm bg-white p-5 sm:p-8">
+          <h3 class="font-semibold">Feedback</h3>
+          <p class="mt-3 leading-7 text-stone-700">{{ report.summary }}</p>
         </div>
       </div>
-    </section>
-
-    <!-- Progress -->
-    <section id="progress" class="scroll-mt-20 py-10">
-      <h2 class="text-2xl font-bold">3. Your progress</h2>
-      <p class="mt-1 text-stone-600">
-        <template v-if="history.length">Your last {{ history.length }} recording{{ history.length > 1 ? 's' : '' }}.</template>
-        <template v-else>Sample data. Your own takes will show here.</template>
-      </p>
-
-      <div class="mt-6 grid gap-4 md:grid-cols-2">
-        <div class="rounded-2xl border border-warm bg-white p-5">
-          <h3 class="font-semibold">Filler words per minute</h3>
-          <p class="text-xs text-stone-500">Lower is better</p>
-          <div class="mt-4 flex h-40 items-end gap-3">
-            <div v-for="h in chartData" :key="h.label" class="flex h-full flex-1 flex-col items-center justify-end gap-1">
-              <span class="text-xs font-semibold">{{ h.fillersPerMin }}</span>
-              <div class="w-full rounded-t-md bg-primary" :style="{ height: Math.max(2, h.fillersPerMin / maxFpm * 80) + '%' }"></div>
-              <span class="text-xs text-stone-500">{{ h.label }}</span>
-            </div>
-          </div>
-        </div>
-        <div class="rounded-2xl border border-warm bg-white p-5">
-          <h3 class="font-semibold">Speaking pace (words/min)</h3>
-          <p class="text-xs text-stone-500">Aim for 140–160</p>
-          <div class="mt-4 flex h-40 items-end gap-3">
-            <div v-for="h in chartData" :key="h.label" class="flex h-full flex-1 flex-col items-center justify-end gap-1">
-              <span class="text-xs font-semibold">{{ h.pace }}</span>
-              <div class="w-full rounded-t-md bg-accent" :style="{ height: Math.max(2, h.pace / maxPace * 80) + '%' }"></div>
-              <span class="text-xs text-stone-500">{{ h.label }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-      <p v-if="trend" class="mt-4 rounded-xl bg-mint/50 px-4 py-3 text-sm text-emerald-900">{{ trend }}</p>
     </section>
   </main>
 
@@ -311,7 +223,7 @@
   // Backend from this repo (server.js), deployed on Cloud Run. For a local backend use 'http://localhost:8080'.
   const API_URL = 'https://hackucd-backend-177345674775.europe-west1.run.app';
 
-  // ---------- Browser storage (per-browser free use, plan and history) ----------
+  // ---------- Browser storage (per-browser free use and plan) ----------
   const store = {
     get(key, fallback = null) {
       try { const v = localStorage.getItem(`outspoken.${key}`); return v === null ? fallback : JSON.parse(v); } catch { return fallback; }
@@ -419,7 +331,7 @@
       .sort((a, b) => b.n - a.n).slice(0, 3)
       .forEach(({ s, n }) => {
         moments.push({
-          start: s[0].start, type: 'Filler words', quote: join(s),
+          start: s[0].start, type: 'Filler words', quote: join(s), clean: withoutFillers(s),
           issue: `${n} filler words in one sentence bury the point.`,
           fix: `Pause instead of filling: "${withoutFillers(s)}"`,
         });
@@ -427,7 +339,7 @@
     const long = sentences.find((s) => s.length >= 40);
     if (long) {
       moments.push({
-        start: long[0].start, type: 'Rambling', quote: join(long.slice(0, 14)) + '…',
+        start: long[0].start, type: 'Rambling', quote: join(long.slice(0, 14)) + '…', count: long.length,
         issue: `This sentence runs ${long.length} words without a break, so the point gets lost.`,
         fix: 'Split it into two or three short sentences, each making one point.',
       });
@@ -436,7 +348,7 @@
       .sort((a, b) => b.w.pause - a.w.pause).slice(0, 2)
       .forEach(({ w, i }) => {
         moments.push({
-          start: words[i - 1].end, type: 'Long pause',
+          start: words[i - 1].end, type: 'Long pause', pause: w.pause,
           quote: `${join(words.slice(Math.max(0, i - 6), i))} … ${join(words.slice(i, i + 6))}`,
           issue: `You paused for ${w.pause.toFixed(1)} seconds here.`,
           fix: 'Cut the gap in editing, or know your next point before you start so you can keep going.',
@@ -446,16 +358,74 @@
 
     const pace = Math.round(words.length / minutes);
     const fillersPerMin = +(fillerTotal / minutes).toFixed(1);
-    const pauses = words.filter((w) => w.pause).length;
-    return {
-      words, fillers, repeated, moments, pace, fillersPerMin,
-      stats: [
-        { label: 'Filler words', value: String(fillerTotal), note: `${fillersPerMin} per minute`, color: fillersPerMin > 4 ? 'text-amber-700' : 'text-primary' },
-        { label: 'Pace', value: String(pace), note: `words/min · ${pace > 170 ? 'a bit fast' : pace < 120 ? 'a bit slow' : 'good pace'}`, color: 'text-cyan-700' },
-        { label: 'Long pauses', value: String(pauses), note: `over ${PAUSE_SECONDS}s`, color: 'text-stone-800' },
-        { label: 'Length', value: fmtTime(duration), note: `${words.length} words`, color: 'text-stone-800' },
-      ],
-    };
+    const analysis = { words, fillers, fillerTotal, repeated, moments, pace, fillersPerMin, duration };
+    return { ...analysis, summary: buildSummary(analysis) };
+  }
+
+  const shorten = (quote, n = 10) => {
+    const parts = quote.replace(/…$/, '').split(' ');
+    return parts.length > n ? `${parts.slice(0, n).join(' ')}…` : parts.join(' ');
+  };
+
+  // One paragraph of coaching from the analysis, most useful points first
+  function buildSummary({ words, fillers, fillerTotal, repeated, moments, pace, duration }) {
+    const parts = [];
+    if (words.length < 25) {
+      parts.push(`This take is short (${words.length} words in ${fmtTime(duration)}), so there is only a little to go on. Record 30 seconds or more for fuller feedback.`);
+    }
+    if (duration >= 10) {
+      const note = pace > 170 ? 'a little fast, so slow down and let your key points land'
+        : pace < 120 ? 'a little slow, so tighten your sentences and lift the energy' : 'a comfortable pace for viewers';
+      parts.push(`You spoke at about ${pace} words per minute, ${note}.`);
+    }
+    if (!fillerTotal) {
+      parts.push('You used no filler words, which keeps you sounding confident.');
+    } else {
+      const top = fillers.slice(0, 3).map((f) => `"${f.word}" (${f.count})`).join(', ');
+      parts.push(`You used ${fillerTotal} filler word${fillerTotal > 1 ? 's' : ''}, mostly ${top}; try a short silent pause instead.`);
+    }
+    if (repeated[0]) {
+      const r = repeated[0];
+      parts.push(`You leaned on "${r.word}" ${r.count} times, so swap in ${r.alternatives.slice(0, 2).join(' or ')} now and then.`);
+    }
+    const opening = moments.find((m) => m.type === 'Weak opening');
+    if (opening) parts.push(`Your opening ("${shorten(opening.quote)}") warms up instead of making a point, so lead with your hook.`);
+    const filler = moments.find((m) => m.type === 'Filler words');
+    if (filler) parts.push(`At ${fmtTime(filler.start)}, "${shorten(filler.quote, 12)}" would land better as "${filler.clean}"`);
+    const rambling = moments.find((m) => m.type === 'Rambling');
+    if (rambling) parts.push(`The sentence at ${fmtTime(rambling.start)} runs ${rambling.count} words, so split it into two or three short ones.`);
+    const pause = moments.find((m) => m.type === 'Long pause');
+    if (pause) parts.push(`You paused for ${pause.pause.toFixed(1)} seconds at ${fmtTime(pause.start)}; trim it in editing.`);
+    if (!fillerTotal && !moments.length && !repeated.length) parts.push('A clean take overall. Keep it up.');
+    return parts.map((p) => (/[.!?]"?$/.test(p) ? p : `${p}.`)).join(' ');
+  }
+
+  // Waveform bars (0..1) from the recording itself
+  async function peaksFromAudio(blob, bars = 72) {
+    const ctx = new AudioContext();
+    try {
+      const audio = await ctx.decodeAudioData(await blob.arrayBuffer());
+      const data = audio.getChannelData(0);
+      const size = Math.floor(data.length / bars);
+      const peaks = Array.from({ length: bars }, (_, i) => {
+        let sum = 0;
+        for (let j = i * size; j < (i + 1) * size; j++) sum += data[j] * data[j];
+        return Math.sqrt(sum / size);
+      });
+      const max = Math.max(...peaks) || 1;
+      return peaks.map((p) => p / max);
+    } finally {
+      ctx.close();
+    }
+  }
+
+  // Fallback waveform from word timings (sample report, or audio the browser cannot decode)
+  function peaksFromWords(words, duration, bars = 72) {
+    return Array.from({ length: bars }, (_, i) => {
+      const t = ((i + 0.5) / bars) * duration;
+      const speaking = words.some((w) => w.start <= t && t <= w.end + 0.1);
+      return speaking ? 0.45 + 0.55 * Math.abs(Math.sin(i * 1.7)) : 0.06;
+    });
   }
 
   function fmtTime(seconds) {
@@ -481,13 +451,6 @@
     return { words, duration: +t.toFixed(2) };
   }
 
-  const SAMPLE_HISTORY = [
-    { label: 'Take 1', fillersPerMin: 8.2, pace: 185 },
-    { label: 'Take 2', fillersPerMin: 6.9, pace: 178 },
-    { label: 'Take 3', fillersPerMin: 5.6, pace: 176 },
-    { label: 'Take 4', fillersPerMin: 4.7, pace: 172 },
-  ];
-
   const { createApp } = Vue;
 
   createApp({
@@ -496,18 +459,17 @@
         navLinks: [
           { href: '#record', label: 'Record' },
           { href: '#feedback', label: 'Feedback' },
-          { href: '#progress', label: 'Progress' },
         ],
         features: [
           { icon: '🎙️', title: 'Record or upload', text: 'Use your mic or drop in a voice memo.' },
           { icon: '🔍', title: 'Specific feedback', text: 'Every note quotes what you said and shows a better way.' },
-          { icon: '📈', title: 'Track progress', text: 'See your filler words drop take after take.' },
+          { icon: '🎧', title: 'Hear it back', text: 'Replay your take, then read one clear paragraph on what to change.' },
         ],
         plans: [
           { id: 'monthly', name: 'Monthly', price: '€15', per: '/month', note: 'Billed monthly after your trial' },
           { id: 'yearly', name: 'Yearly', price: '€150', per: '/year', note: '€12.50/month · save €30', badge: 'Best value' },
         ],
-        perks: ['Unlimited full analyses, every day', 'Transcript breakdown and moments to fix', 'Progress tracking across every take', '7 days free, cancel any time'],
+        perks: ['Unlimited full analyses, every day', 'Written feedback on every take', '7 days free, cancel any time'],
         tagClass: {
           'Weak opening': 'bg-amber-100 text-amber-800',
           'Filler words': 'bg-accent/15 text-cyan-800',
@@ -523,7 +485,8 @@
         audioUrl: '',
         audioName: '',
         report: null,
-        history: store.get('history', []),
+        playing: false,
+        playTime: 0,
         freeDay: store.get('freeDay'),
         sub: store.get('sub'),
         paywall: { open: false, limitHit: false, plan: 'yearly', loading: false, error: '' },
@@ -534,20 +497,10 @@
       isPro() { return !!this.sub?.active; },
       freeLeft() { return this.freeDay !== today(); },
       selectedPlan() { return this.plans.find((p) => p.id === this.paywall.plan); },
-      chartData() { return this.history.length ? this.history : SAMPLE_HISTORY; },
-      maxFpm() { return Math.max(1, ...this.chartData.map((h) => h.fillersPerMin)); },
-      maxPace() { return Math.max(200, ...this.chartData.map((h) => h.pace)); },
-      trend() {
-        const data = this.chartData;
-        const first = data[0], last = data[data.length - 1];
-        if (data.length < 2 || !first.fillersPerMin) return '';
-        const drop = Math.round((1 - last.fillersPerMin / first.fillersPerMin) * 100);
-        return drop > 0 ? `Nice work: ${drop}% fewer filler words than your first take.` : '';
-      },
     },
     mounted() {
       this.drawIdleWave();
-      window.addEventListener('resize', () => this.state !== 'recording' && this.drawIdleWave());
+      window.addEventListener('resize', () => { if (this.state !== 'recording') this.drawIdleWave(); this.drawPlayback(); });
       window.addEventListener('keydown', (e) => { if (e.key === 'Escape') this.paywall.open = false; });
       this.handleCheckoutReturn();
     },
@@ -612,10 +565,10 @@
           this.busy = 'Transcribing…';
           const transcript = await api(`/api/recordings/${recording.id}/transcript`, { method: 'POST' });
           const analysis = analyseTranscript(transcript);
-          this.report = { ...analysis, audioUrl: this.audioUrl, isSample: false };
+          let peaks;
+          try { peaks = await peaksFromAudio(this.audioBlob); } catch { peaks = peaksFromWords(analysis.words, analysis.duration); }
+          this.setReport({ ...analysis, peaks, audioUrl: this.audioUrl, isSample: false });
           if (!this.isPro) { this.freeDay = today(); store.set('freeDay', this.freeDay); }
-          this.history = [...this.history, { label: `Take ${this.history.length + 1}`, fillersPerMin: analysis.fillersPerMin, pace: analysis.pace }].slice(-6);
-          store.set('history', this.history);
           this.scrollTo('feedback');
         } catch (err) {
           this.error = err.message;
@@ -640,14 +593,63 @@
         return api(`/api/recordings/${link.id}/complete`, { method: 'POST' });
       },
       showSample() {
-        this.report = { ...analyseTranscript(sampleTranscript()), audioUrl: '', isSample: true };
+        const analysis = analyseTranscript(sampleTranscript());
+        this.setReport({ ...analysis, peaks: peaksFromWords(analysis.words, analysis.duration), audioUrl: '', isSample: true });
         this.scrollTo('feedback');
       },
-      seek(seconds) {
+      setReport(report) {
+        this.$refs.player?.pause();
+        this.playing = false;
+        this.playTime = 0;
+        this.report = report;
+        this.$nextTick(() => this.drawPlayback());
+      },
+
+      // ---------- Playback box ----------
+      togglePlay() {
         const player = this.$refs.player;
         if (!player) return;
-        player.currentTime = seconds;
-        player.play();
+        if (player.paused) player.play(); else player.pause();
+      },
+      onPlay() {
+        this.playing = true;
+        const tick = () => {
+          this.playTime = this.$refs.player?.currentTime || 0;
+          this.drawPlayback();
+          if (this.playing) requestAnimationFrame(tick);
+        };
+        tick();
+      },
+      onEnded() {
+        this.playing = false;
+        this.playTime = 0;
+        this.drawPlayback();
+      },
+      seekFromWave(e) {
+        const player = this.$refs.player;
+        if (!player || !this.report.duration) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        player.currentTime = ((e.clientX - rect.left) / rect.width) * (player.duration || this.report.duration);
+        this.playTime = player.currentTime;
+        this.drawPlayback();
+      },
+      drawPlayback() {
+        const c = this.$refs.playback;
+        if (!c || !this.report) return;
+        const dpr = window.devicePixelRatio || 1;
+        c.width = c.clientWidth * dpr;
+        c.height = c.clientHeight * dpr;
+        const ctx = c.getContext('2d');
+        const { peaks, duration } = this.report;
+        const gap = 3 * dpr;
+        const w = (c.width - gap * (peaks.length - 1)) / peaks.length;
+        const played = duration ? this.playTime / duration : 0;
+        ctx.fillStyle = '#06B6D4';
+        peaks.forEach((v, i) => {
+          const h = Math.max(3 * dpr, v * c.height);
+          ctx.globalAlpha = (i + 0.5) / peaks.length <= played ? 1 : 0.35;
+          ctx.fillRect(i * (w + gap), (c.height - h) / 2, w, h);
+        });
       },
       scrollTo(id) {
         this.$nextTick(() => document.getElementById(id).scrollIntoView({ behavior: 'smooth' }));
